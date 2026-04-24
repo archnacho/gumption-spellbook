@@ -23,15 +23,20 @@ h1{text-align:center;margin-bottom:20px}
 
 .add-row{display:grid;grid-template-columns:1fr auto;gap:10px;margin-bottom:10px}
 
-input,select,textarea{padding:10px;border-radius:10px;border:1px solid var(--border);background:#121427;color:white}
+input,select{padding:10px;border-radius:10px;border:1px solid var(--border);background:#121427;color:white}
 
 button{padding:10px;border:none;border-radius:10px;cursor:pointer}
 .primary-btn{background:var(--accent);color:white}
 
 .filter-bar{display:flex;justify-content:space-between;margin-bottom:12px}
+.filter-btn{padding:6px 10px;border-radius:999px;background:#121427;border:1px solid var(--border)}
+.filter-btn.active{background:var(--accent)}
 
 table{width:100%;border-collapse:collapse}
 th,td{padding:10px;border-bottom:1px solid rgba(255,255,255,0.05)}
+th{cursor:pointer}
+
+.spell-link{cursor:pointer;color:#d8ccff}
 
 .modal{position:fixed;inset:0;background:rgba(0,0,0,0.7);display:none;align-items:center;justify-content:center}
 .modal.open{display:flex}
@@ -73,31 +78,44 @@ th,td{padding:10px;border-bottom:1px solid rgba(255,255,255,0.05)}
 </div>
 </div>
 
+<!-- SPELL MODAL -->
+<div class="modal" id="spellModal">
+<div class="modal-content">
+<div style="display:flex;justify-content:space-between;">
+<h2 id="modalTitle"></h2>
+<button id="deleteFromModal">🗑️</button>
+</div>
+<div id="modalStats"></div>
+<div id="modalDesc"></div>
+</div>
+</div>
+
 <!-- CUSTOM SPELL MODAL -->
 <div class="modal" id="customModal">
 <div class="modal-content">
 <h2>Add Custom Spell</h2>
 
 <input id="cName" placeholder="Name">
-<select id="cCast"><option>A</option><option>BA</option><option>R</option></select>
+
+<select id="cCast">
+<option>A</option><option>BA</option><option>R</option>
+</select>
 
 <select id="cRange">
-<option>Self</option><option>Touch</option><option>10 feet</option>
-<option>30 feet</option><option>60 feet</option><option>120 feet</option>
+<option>Self</option><option>Touch</option><option>10 feet</option><option>30 feet</option><option>60 feet</option><option>120 feet</option>
 </select>
 
 <select id="cDuration">
-<option>1 round</option><option>1 minute</option>
-<option>10 minutes</option><option>1 hour</option>
+<option>1 round</option><option>1 minute</option><option>10 minutes</option><option>1 hour</option>
 </select>
 
 <select id="cLevel">
-<option>C</option><option>1</option><option>2</option><option>3</option>
-<option>4</option><option>5</option><option>6</option><option>7</option>
+<option>C</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option>
 </select>
 
 <label><input type="checkbox" id="cRP"> RP</label>
-<textarea id="cDesc" placeholder="Description"></textarea>
+
+<textarea id="cDesc" placeholder="Description" style="margin-top:10px;width:100%;height:80px;"></textarea>
 
 <div style="margin-top:10px;display:flex;gap:10px;">
 <button class="primary-btn" id="saveCustom">Save</button>
@@ -119,19 +137,13 @@ const db=firebase.firestore();
 const CHARACTERS=['Candy Calderón','Cooper Howard','Deekin Rush','Kuz Rakata','Percy Fireside'];
 
 let activeCharacter=CHARACTERS[0];
+let showRPView=false;
+let filters={cast:'All',rp:'All RP'};
 let spellbook={};
-let csvIndex={};
 let isLoaded=false;
+let csvIndex={}; // ✅ ADDED
 
-const slug = s => s.trim().toLowerCase().replace(/\s+/g,'-');
-const cast = c => c.toLowerCase().includes('bonus')?'BA':c.toLowerCase().includes('reaction')?'R':'A';
-const lvl = l => l==0?'C':l;
-
-function initStructure(){
-const d={};
-CHARACTERS.forEach(c=>d[c]=[]);
-return d;
-}
+function initStructure(){const d={};CHARACTERS.forEach(c=>d[c]=[]);return d;}
 
 db.collection('spellbook').doc('shared').onSnapshot(doc=>{
 spellbook=doc.exists?doc.data():initStructure();
@@ -143,6 +155,41 @@ function save(){
 if(!isLoaded)return;
 db.collection('spellbook').doc('shared').set(spellbook,{merge:true});
 }
+
+function slug(s){return s.trim().toLowerCase().replace(/\s+/g,'-')}
+function cast(c){c=c.toLowerCase();if(c.includes('bonus'))return'BA';if(c.includes('reaction'))return'R';return'A'}
+function lvl(l){return l==0?'C':l}
+
+////////////////////////////////
+// CSV IMPORT (SAFE ADD)
+////////////////////////////////
+function parseCSV(text){
+const lines=text.split(/\r?\n/);
+const headers=lines[0].split(',');
+
+const index={};
+
+for(let i=1;i<lines.length;i++){
+const values=lines[i].split(',');
+const row={};
+headers.forEach((h,j)=>row[h.trim()]=values[j]?.trim());
+
+if(row.Name){
+index[slug(row.Name)] = row;
+}
+}
+return index;
+}
+
+csvFile.onchange=async e=>{
+const file=e.target.files[0];
+if(!file)return;
+
+const text=await file.text();
+csvIndex=parseCSV(text);
+
+console.log("CSV Loaded:", Object.keys(csvIndex).length);
+};
 
 ////////////////////////////////
 // CUSTOM SPELL
@@ -170,41 +217,7 @@ customModal.classList.remove('open');
 };
 
 ////////////////////////////////
-// CSV (IMPROVED)
-////////////////////////////////
-function parseCSV(text){
-const lines=text.split(/\r?\n/);
-const headers=lines[0].split(',');
-
-const index={};
-
-for(let i=1;i<lines.length;i++){
-const values=lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/); // 👈 handles commas in quotes
-const row={};
-
-headers.forEach((h,j)=>{
-row[h.trim()] = values[j]?.replace(/^"|"$/g,'').trim();
-});
-
-if(row.Name){
-index[slug(row.Name)] = row;
-}
-}
-return index;
-}
-
-csvFile.onchange=async e=>{
-const file=e.target.files[0];
-if(!file)return;
-
-const text=await file.text();
-csvIndex=parseCSV(text);
-
-console.log("CSV Loaded:", Object.keys(csvIndex).length);
-};
-
-////////////////////////////////
-// ADD SPELL
+// ADD SPELL (CSV FALLBACK ADDED)
 ////////////////////////////////
 async function add(){
 const name=spellInput.value.trim();
@@ -235,16 +248,17 @@ return;
 
 }catch{
 const c=csvIndex[s];
+
 if(c){
 spellbook[activeCharacter].push({
 id:crypto.randomUUID(),
-name:c.Name || name,
+name:c.Name,
 cast:cast(c['Casting Time']||'1 action'),
 range:c.Range || '',
 duration:c.Duration || '',
 level:lvl(c.Level||0),
 rp:false,
-desc:c.Details||''
+desc:c.Details || ''
 });
 save();
 spellInput.value='';
@@ -262,14 +276,17 @@ spellInput.onkeydown=e=>{if(e.key==='Enter')add()};
 // RENDER
 ////////////////////////////////
 function render(){
-tableHead.innerHTML='<th>Name</th><th>Cast</th><th>Range</th><th>Duration</th><th>Lvl</th><th>RP</th>';
-spellTableBody.innerHTML='';
+const b=spellTableBody;
+const head=tableHead;
+
+head.innerHTML='<th>Name</th><th>Cast</th><th>Range</th><th>Duration</th><th>Lvl</th><th>RP</th>';
+
+b.innerHTML='';
 
 (spellbook[activeCharacter]||[]).forEach(sp=>{
 const tr=document.createElement('tr');
-
 tr.innerHTML=`
-<td>${sp.name}</td>
+<td><span class="spell-link">${sp.name}</span></td>
 <td>${sp.cast}</td>
 <td>${sp.range}</td>
 <td>${sp.duration}</td>
@@ -282,22 +299,23 @@ sp.rp=e.target.checked;
 save();
 };
 
-spellTableBody.appendChild(tr);
+b.appendChild(tr);
 });
 }
 
+tabs();
+
 function tabs(){
-tabs.innerHTML='';
+const t=document.getElementById('tabs');
+t.innerHTML='';
 CHARACTERS.forEach(c=>{
 const b=document.createElement('button');
 b.className='tab '+(c===activeCharacter?'active':'');
 b.textContent=c;
 b.onclick=()=>{activeCharacter=c;tabs();render()};
-tabs.appendChild(b);
+t.appendChild(b);
 });
 }
-
-tabs();
 </script>
 </body>
 </html>
