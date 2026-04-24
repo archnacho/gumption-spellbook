@@ -41,10 +41,12 @@ th{cursor:pointer}
 <button id="addSpellBtn" class="primary-btn">Add</button>
 </div>
 <div id="errorMsg" class="error-msg"></div>
+
 <div class="filter-bar">
 <div id="castFilters"></div>
 <div id="rpFilters"></div>
 </div>
+
 <table>
 <thead><tr></tr></thead>
 <tbody id="spellTableBody"></tbody>
@@ -97,6 +99,13 @@ th{cursor:pointer}
 </div>
 
 <script>
+const DOM = {
+  tableBody: document.getElementById('spellTableBody'),
+  tableHead: document.querySelector('thead tr'),
+  error: document.getElementById('errorMsg'),
+  spellInput: document.getElementById('spellInput')
+};
+
 const firebaseConfig={
 apiKey:"AIzaSyD6BdFsQ0x93JuJjCeeaZjB5ASpuTw-ALw",
 authDomain:"gumption-spellbook.firebaseapp.com",
@@ -124,14 +133,12 @@ CHARACTERS.forEach(c=>d[c]=[]);
 return d;
 }
 
-// 🔥 LIVE SYNC
 db.collection('spellbook').doc('shared').onSnapshot(doc=>{
 spellbook=doc.exists?doc.data():initStructure();
 isLoaded=true;
 render();
 });
 
-// 🔥 SAVE
 function save(){
 if(!isLoaded)return;
 db.collection('spellbook').doc('shared').set(spellbook);
@@ -142,8 +149,40 @@ function cast(c){c=c.toLowerCase();if(c.includes('bonus'))return'BA';if(c.includ
 function lvl(l){return l==0?'C':l}
 function url(n){return`https://www.dndbeyond.com/spells/${slug(n)}`}
 
-// EVERYTHING ELSE BELOW IS UNCHANGED
-// (intentionally left exactly as your version)
+function normalizeSpell(sp){
+return {
+id: sp.id || crypto.randomUUID(),
+name: sp.name || '',
+cast: sp.cast || 'A',
+range: sp.range || '',
+duration: sp.duration || '',
+level: sp.level || 'C',
+rp: sp.rp || false,
+desc: sp.desc || ''
+};
+}
+
+function getSpellById(id){
+return (spellbook[activeCharacter]||[]).find(s=>s.id===id);
+}
+
+function buildSpellRow(sp,isRPView){
+if(isRPView){
+return `<td>${sp.character}</td>
+<td><span class="spell-link">${sp.name}</span></td>
+<td>${sp.cast}</td>
+<td>${sp.range}</td>
+<td>${sp.duration}</td>
+<td>${sp.level}</td>`;
+}else{
+return `<td><span class="spell-link">${sp.name}</span></td>
+<td>${sp.cast}</td>
+<td>${sp.range}</td>
+<td>${sp.duration}</td>
+<td>${sp.level}</td>
+<td><input type="checkbox" ${sp.rp?'checked':''}></td>`;
+}
+}
 
 function tabs(){const t=document.getElementById('tabs');t.innerHTML='';
 CHARACTERS.forEach(c=>{const b=document.createElement('button');b.className='tab '+(!showRPView&&c===activeCharacter?'active':'');b.textContent=c;b.onclick=()=>{activeCharacter=c;showRPView=false;tabs();render()};t.appendChild(b)});
@@ -168,9 +207,9 @@ function getSpells(){
 let s;
 if(showRPView){
 s=[];
-CHARACTERS.forEach(c=>{spellbook[c].forEach(sp=>{if(sp.rp)s.push({...sp,character:c})})});
+CHARACTERS.forEach(c=>{(spellbook[c]||[]).forEach(sp=>{if(sp.rp)s.push({...sp,character:c})})});
 }else{
-s=[...spellbook[activeCharacter]];
+s=[...(spellbook[activeCharacter]||[])];
 if(filters.cast!=='All')s=s.filter(x=>x.cast===filters.cast);
 if(filters.rp==='RP Only')s=s.filter(x=>x.rp);
 if(filters.rp==='Hide RP')s=s.filter(x=>!x.rp);
@@ -198,10 +237,12 @@ return s;
 }
 
 function render(){
-const b=document.getElementById('spellTableBody');
+if(!spellbook || !activeCharacter) return;
+
+const b=DOM.tableBody;
 const s=getSpells();
 b.innerHTML='';
-const head=document.querySelector('thead tr');
+const head=DOM.tableHead;
 
 if(showRPView){
 head.innerHTML=`
@@ -225,14 +266,18 @@ if(!s.length){b.innerHTML='<tr><td colspan=7>No spells</td></tr>';return;}
 
 s.forEach(sp=>{
 const tr=document.createElement('tr');
-if(showRPView){
-tr.innerHTML=`<td>${sp.character}</td><td><span class="spell-link">${sp.name}</span></td><td>${sp.cast}</td><td>${sp.range}</td><td>${sp.duration}</td><td>${sp.level}</td>`;
+tr.innerHTML=buildSpellRow(sp,showRPView);
+
 tr.querySelector('.spell-link').onclick=()=>open(sp);
-}else{
-tr.innerHTML=`<td><span class="spell-link">${sp.name}</span></td><td>${sp.cast}</td><td>${sp.range}</td><td>${sp.duration}</td><td>${sp.level}</td><td><input type="checkbox" ${sp.rp?'checked':''}></td>`;
-tr.querySelector('.spell-link').onclick=()=>open(sp);
-tr.querySelector('input').onchange=e=>{sp.rp=e.target.checked;save();render()};
+
+if(!showRPView){
+tr.querySelector('input').onchange=e=>{
+sp.rp=e.target.checked;
+save();
+render();
+};
 }
+
 b.appendChild(tr);
 });
 
@@ -268,7 +313,7 @@ function parseCSV(t){const l=t.split(/\n/);const h=l[0].split(',');const idx={};
 document.getElementById('csvFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;csvIndex=parseCSV(await f.text())};
 
 async function add(){
-const input=document.getElementById('spellInput');
+const input=DOM.spellInput;
 const n=input.value.trim();
 if(!n)return;
 const s=slug(n);
@@ -276,26 +321,228 @@ try{
 const r=await fetch(`https://www.dnd5eapi.co/api/spells/${s}`);
 if(!r.ok)throw'';
 const d=await r.json();
-spellbook[activeCharacter].push({id:crypto.randomUUID(),name:d.name,url:url(d.name),cast:cast(d.casting_time),range:d.range,duration:d.duration,level:lvl(d.level),rp:false,desc:(d.desc||[]).join('\n')});
+spellbook[activeCharacter].push(normalizeSpell({id:crypto.randomUUID(),name:d.name,url:url(d.name),cast:cast(d.casting_time),range:d.range,duration:d.duration,level:lvl(d.level),rp:false,desc:(d.desc||[]).join('\n')}));
 save();input.value='';render();
 }catch{
 const c=csvIndex[s];
 if(c){
-spellbook[activeCharacter].push({id:crypto.randomUUID(),name:c.Name,url:url(c.Name),cast:cast(c['Casting Time']||'1 action'),range:c.Range,duration:c.Duration,level:lvl(c.Level||0),rp:false,desc:c.Details||''});
+spellbook[activeCharacter].push(normalizeSpell({id:crypto.randomUUID(),name:c.Name,url:url(c.Name),cast:cast(c['Casting Time']||'1 action'),range:c.Range,duration:c.Duration,level:lvl(c.Level||0),rp:false,desc:c.Details||''}));
 save();input.value='';render();
 }else{
-document.getElementById('errorMsg').textContent='Spell not found';
-setTimeout(()=>document.getElementById('errorMsg').textContent='',2000);
+DOM.error.textContent='Spell not found';
+setTimeout(()=>DOM.error.textContent='',2000);
 }
 }
 }
 
 document.getElementById('addSpellBtn').onclick=add;
-document.getElementById('spellInput').onkeydown=e=>{if(e.key==='Enter')add()};
+DOM.spellInput.onkeydown=e=>{if(e.key==='Enter')add()};
 
 tabs();
 filtersUI();
 render();
 </script>
+
+<script>
+
+// ===== COMBAT QUEUE (SAFE ADD-ON) =====
+
+let combatQueue = [];
+let initiatives = {}; 
+
+// 🔥 ADD QUEUE BUTTON (safe injection)
+function ensureQueueButton(){
+  const bar = document.querySelector('.filter-bar');
+  if(!bar) return;
+
+  if(!document.getElementById('queueBtn')){
+    const btn = document.createElement('button');
+    btn.id = 'queueBtn';
+    btn.className = 'primary-btn';
+    btn.textContent = 'Queue';
+    btn.onclick = toggleQueue;
+    bar.appendChild(btn);
+  }
+}
+
+// 🔥 PANEL
+function toggleQueue(){
+  let panel = document.getElementById('queuePanel');
+
+  if(!panel){
+    panel = document.createElement('div');
+    panel.id = 'queuePanel';
+    panel.style = `
+      position:fixed;
+      top:0;
+      right:0;
+      width:33%;
+      height:100%;
+      background:#111326;
+      border-left:1px solid rgba(255,255,255,0.1);
+      padding:16px;
+      overflow:auto;
+      z-index:100;
+    `;
+    document.body.appendChild(panel);
+  }
+
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+  renderQueue();
+}
+
+function clearQueue(){
+  combatQueue = [];
+  renderQueue();
+}
+
+// CHARACTER QUEUE CLEAR
+function clearCharacterQueue(character){
+  combatQueue = combatQueue.map(round =>
+    round.filter(r => r.character !== character)
+  ).filter(round => round.length > 0);
+
+  renderQueue();
+}
+
+// 🔥 QUEUE LOGIC
+function queueSpell(spell){
+  if(!combatQueue.length) combatQueue.push([]);
+
+  let placed = false;
+
+  for(let round of combatQueue){
+    const exists = round.find(r =>
+      r.character === activeCharacter &&
+      r.cast === spell.cast
+    );
+
+    if(!exists){
+      round.push({...spell, character: activeCharacter});
+      placed = true;
+      break;
+    }
+  }
+
+  if(!placed){
+    combatQueue.push([{...spell, character: activeCharacter}]);
+  }
+
+  renderQueue();
+}
+
+// 🔥 RENDER
+function renderQueue(){
+  const panel = document.getElementById('queuePanel');
+  if(!panel) return;
+
+  panel.innerHTML = `
+	  <div style="display:flex;justify-content:space-between;">
+		<h2>Combat Queue</h2>
+		<button onclick="toggleQueue()">✖</button>
+	  </div>
+	  <div id="initiativeSection" style="margin-bottom:12px;"></div>
+	  <hr>
+	  <div id="queueContent"></div>
+	  <button onclick="clearQueue()" style="margin-top:10px;">Clear Full Queue</button>
+`;
+
+const initDiv = panel.querySelector('#initiativeSection');
+
+initDiv.innerHTML = '<b style="font-size:14px;">Init</b>';
+
+CHARACTERS.forEach(char => {
+  const row = document.createElement('div');
+  row.style.display = 'flex';
+  row.style.alignItems = 'center';
+  row.style.justifyContent = 'flex-start'; // 👈 LEFT align
+  row.style.marginBottom = '2px';
+  row.style.fontSize = '12px';
+  row.style.gap = '6px'; // 👈 small spacing between input + name
+
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.style.width = '38px';
+  input.style.height = '20px';
+  input.style.fontSize = '12px';
+  input.style.padding = '2px';
+  input.value = initiatives[char] || '';
+
+  input.onchange = (e) => {
+    initiatives[char] = Number(e.target.value) || 0;
+    renderQueue();
+  };
+
+  const label = document.createElement('span');
+  label.textContent = char;
+
+const clearBtn = document.createElement('span');
+clearBtn.textContent = '✖';
+clearBtn.style.cursor = 'pointer';
+clearBtn.style.color = '#ff6b6b';
+clearBtn.style.fontSize = '12px';
+clearBtn.style.marginLeft = '4px';
+
+clearBtn.onclick = () => {
+  clearCharacterQueue(char);
+};
+
+// 👇 NEW ORDER
+row.appendChild(input);
+row.appendChild(label);
+row.appendChild(clearBtn);
+
+  initDiv.appendChild(row);
+});
+
+  const c = panel.querySelector('#queueContent');
+
+  combatQueue.forEach((round,i)=>{
+    let html = `<b>Round ${i+1}</b><br>`;
+    [...round]
+	.sort((a,b) => (initiatives[b.character] || 0) - (initiatives[a.character] || 0))
+	.forEach(r=>{
+	  html += `${r.character} (${r.cast}): ${r.name}<br>`;
+	});
+
+    const div = document.createElement('div');
+    div.innerHTML = html;
+    div.style.marginBottom = '10px';
+    c.appendChild(div);
+  });
+}
+
+// 🔥 RELIABLE CLICK BINDING
+function bindQueueClicks(){
+  document.querySelectorAll('#spellTableBody tr').forEach(tr=>{
+    const tds = tr.querySelectorAll('td');
+    if(tds.length < 2) return;
+
+    const castCell = tds[1];
+    const nameCell = tds[0];
+
+    if(!castCell.dataset.queueBound){
+      castCell.dataset.queueBound = true;
+      castCell.style.cursor = 'pointer';
+
+      castCell.onclick = ()=>{
+        const name = nameCell.innerText;
+        const spell = (spellbook[activeCharacter] || []).find(s => s.name === name);
+        if(spell){
+          queueSpell(spell);
+        }
+      };
+    }
+  });
+}
+
+// 🔥 MAIN LOOP (safe + lightweight)
+setInterval(()=>{
+  ensureQueueButton();
+  bindQueueClicks();
+}, 300);
+
+</script>
+
 </body>
 </html>
