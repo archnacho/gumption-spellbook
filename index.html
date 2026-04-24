@@ -15,32 +15,24 @@
 body{margin:0;font-family:Inter,system-ui;background:radial-gradient(circle at top,#1d1f3f,#070811);color:var(--text)}
 .container{max-width:1200px;margin:auto;padding:24px}
 h1{text-align:center;margin-bottom:20px}
-
 .tabs{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-bottom:20px}
-.tab{padding:10px 16px;border-radius:999px;background:#181a2f;border:1px solid var(--border);cursor:pointer}
-.tab.active{background:linear-gradient(135deg,#7c5cff,#5b7cff)}
-
+.tab{padding:10px 16px;border-radius:999px;background:#181a2f;border:1px solid var(--border);cursor:pointer;color:var(--text)}
+.tab.active{background:linear-gradient(135deg,#7c5cff,#5b7cff);color:#fff}
 .panel{background:var(--bg2);padding:20px;border-radius:16px}
 .add-row{display:grid;grid-template-columns:1fr auto;gap:10px;margin-bottom:10px}
-
 input{padding:12px;border-radius:10px;border:1px solid var(--border);background:#121427;color:white}
 button{padding:12px;border:none;border-radius:10px;cursor:pointer}
 .primary-btn{background:var(--accent);color:white}
-
 .error-msg{color:#ff9cac;height:20px}
-
 .filter-bar{display:flex;justify-content:space-between;margin-bottom:10px}
 .filter-btn{padding:6px 10px;border-radius:999px;background:#121427;color:var(--muted);border:1px solid var(--border)}
 .filter-btn.active{background:var(--accent);color:white}
-
 table{width:100%;border-collapse:collapse}
 th,td{padding:10px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:center}
 th:first-child, td:first-child{text-align:left}
 th:nth-child(2), td:nth-child(2){text-align:left}
 th{cursor:pointer}
-
 .spell-link{cursor:pointer;color:#d8ccff}
-
 .modal{position:fixed;inset:0;background:rgba(0,0,0,0.7);display:none;align-items:center;justify-content:center}
 .modal.open{display:flex}
 .modal-content{background:#202442;padding:20px;border-radius:16px;max-width:700px;width:100%}
@@ -105,28 +97,20 @@ let showRPView=false;
 let filters={cast:'All',rp:'All RP'};
 let spellbook=initStructure();
 let isLoaded=false;
+let sortState={column:'name',direction:'asc'};
 
-function initStructure(){
-  const d={};
-  CHARACTERS.forEach(c=>d[c]=[]);
-  return d;
-}
+function initStructure(){const d={};CHARACTERS.forEach(c=>d[c]=[]);return d;}
 
-// ✅ SAFE REALTIME SYNC
-db.collection('spellbook').doc('shared')
-.onSnapshot(doc=>{
-  if(doc.exists){
-    spellbook = doc.data();
-  } else {
-    spellbook = initStructure();
-  }
-  isLoaded = true;
-  render();
+db.collection('spellbook').doc('shared').onSnapshot(doc=>{
+if(doc.exists){spellbook=doc.data();}
+else{spellbook=initStructure();}
+isLoaded=true;
+render();
 });
 
 function save(){
-  if(!isLoaded) return;
-  db.collection('spellbook').doc('shared').set(spellbook, { merge:true });
+if(!isLoaded)return;
+db.collection('spellbook').doc('shared').set(spellbook,{merge:true});
 }
 
 function slug(s){return s.trim().toLowerCase().replace(/\s+/g,'-')}
@@ -134,58 +118,65 @@ function cast(c){c=c.toLowerCase();if(c.includes('bonus'))return'BA';if(c.includ
 function lvl(l){return l==0?'C':l}
 function url(n){return`https://www.dndbeyond.com/spells/${slug(n)}`}
 
-function tabs(){
-const t=document.getElementById('tabs');
-t.innerHTML='';
-CHARACTERS.forEach(c=>{
-  const b=document.createElement('button');
-  b.className='tab '+(c===activeCharacter?'active':'');
-  b.textContent=c;
-  b.onclick=()=>{activeCharacter=c;tabs();render()};
-  t.appendChild(b);
-});
-}
+function tabs(){const t=document.getElementById('tabs');t.innerHTML='';
+CHARACTERS.forEach(c=>{const b=document.createElement('button');b.className='tab '+(!showRPView&&c===activeCharacter?'active':'');b.textContent=c;b.onclick=()=>{activeCharacter=c;showRPView=false;tabs();render()};t.appendChild(b)});
+const rp=document.createElement('button');rp.className='tab '+(showRPView?'active':'');rp.textContent='RP';rp.onclick=()=>{showRPView=true;tabs();render()};t.appendChild(rp)}
+
+function filtersUI(){const castOpts=['All','A','BA','R'];const rpOpts=['All RP','RP Only','Hide RP'];
+const c=document.getElementById('castFilters');const r=document.getElementById('rpFilters');c.innerHTML='';r.innerHTML='';
+castOpts.forEach(o=>{const b=document.createElement('button');b.className='filter-btn '+(filters.cast===o?'active':'');b.textContent=o;b.onclick=()=>{filters.cast=o;filtersUI();render()};c.appendChild(b)});
+rpOpts.forEach(o=>{const b=document.createElement('button');b.className='filter-btn '+(filters.rp===o?'active':'');b.textContent=o;b.onclick=()=>{filters.rp=o;filtersUI();render()};r.appendChild(b)})}
+
+function setSort(col){if(sortState.column===col){sortState.direction=sortState.direction==='asc'?'desc':'asc';}else{sortState.column=col;sortState.direction='asc';}render();}
 
 function getSpells(){
-return spellbook[activeCharacter]||[];
+let s;
+if(showRPView){s=[];CHARACTERS.forEach(c=>{spellbook[c].forEach(sp=>{if(sp.rp)s.push({...sp,character:c})})});}
+else{s=[...spellbook[activeCharacter]];if(filters.cast!=='All')s=s.filter(x=>x.cast===filters.cast);if(filters.rp==='RP Only')s=s.filter(x=>x.rp);if(filters.rp==='Hide RP')s=s.filter(x=>!x.rp);}
+s.sort((a,b)=>{let A=a[sortState.column]||'';let B=b[sortState.column]||'';if(A<B)return sortState.direction==='asc'?-1:1;if(A>B)return sortState.direction==='asc'?1:-1;return a.name.localeCompare(b.name);});
+return s;
 }
 
 function render(){
 const b=document.getElementById('spellTableBody');
+const s=getSpells();
 b.innerHTML='';
-getSpells().forEach(sp=>{
+const head=document.querySelector('thead tr');
+
+if(showRPView){
+head.innerHTML=`<th onclick="setSort('character')">Character</th><th onclick="setSort('name')">Name</th><th onclick="setSort('cast')">Cast</th><th onclick="setSort('range')">Range</th><th onclick="setSort('duration')">Duration</th><th onclick="setSort('level')">Lvl</th>`;
+}else{
+head.innerHTML=`<th onclick="setSort('name')">Name</th><th onclick="setSort('cast')">Cast</th><th onclick="setSort('range')">Range</th><th onclick="setSort('duration')">Duration</th><th onclick="setSort('level')">Lvl</th><th onclick="setSort('rp')">RP</th>`;
+}
+
+if(!s.length){b.innerHTML='<tr><td colspan=7>No spells</td></tr>';return;}
+
+s.forEach(sp=>{
 const tr=document.createElement('tr');
-tr.innerHTML=`
-<td><span class="spell-link">${sp.name}</span></td>
-<td>${sp.cast}</td>
-<td>${sp.range}</td>
-<td>${sp.duration}</td>
-<td>${sp.level}</td>
-<td><input type="checkbox" ${sp.rp?'checked':''}></td>
-`;
+if(showRPView){
+tr.innerHTML=`<td>${sp.character}</td><td><span class="spell-link">${sp.name}</span></td><td>${sp.cast}</td><td>${sp.range}</td><td>${sp.duration}</td><td>${sp.level}</td>`;
+tr.querySelector('.spell-link').onclick=()=>open(sp);
+}else{
+tr.innerHTML=`<td><span class="spell-link">${sp.name}</span></td><td>${sp.cast}</td><td>${sp.range}</td><td>${sp.duration}</td><td>${sp.level}</td><td><input type="checkbox" ${sp.rp?'checked':''}></td>`;
 tr.querySelector('.spell-link').onclick=()=>open(sp);
 tr.querySelector('input').onchange=e=>{sp.rp=e.target.checked;save();};
+}
 b.appendChild(tr);
 });
+
+document.querySelector('.add-row').style.display=showRPView?'none':'grid';
 }
 
 function open(sp){
 window.currentModalSpell=sp;
 document.getElementById('modalTitle').textContent=sp.name;
 document.getElementById('modalDesc').textContent=sp.desc;
-document.getElementById('modalStats').innerHTML=`
-<div>Cast: ${sp.cast}</div>
-<div>Range: ${sp.range}</div>
-<div>Duration: ${sp.duration}</div>
-<div>Level: ${sp.level}</div>
-`;
+document.getElementById('modalStats').innerHTML=`<div><b>Cast:</b> ${sp.cast}</div><div><b>Range:</b> ${sp.range}</div><div><b>Duration:</b> ${sp.duration}</div><div><b>Level:</b> ${sp.level}</div>`;
 document.getElementById('spellModal').classList.add('open');
 }
 
 document.getElementById('spellModal').onclick=e=>{
-if(e.target.id==='spellModal'){
-document.getElementById('spellModal').classList.remove('open');
-}
+if(e.target.id==='spellModal'){document.getElementById('spellModal').classList.remove('open');}
 };
 
 document.getElementById('deleteFromModal').onclick=()=>{
@@ -204,18 +195,8 @@ try{
 const r=await fetch(`https://www.dnd5eapi.co/api/spells/${s}`);
 if(!r.ok)throw'';
 const d=await r.json();
-spellbook[activeCharacter].push({
-id:crypto.randomUUID(),
-name:d.name,
-cast:cast(d.casting_time),
-range:d.range,
-duration:d.duration,
-level:lvl(d.level),
-rp:false,
-desc:(d.desc||[]).join('\\n')
-});
-save();
-input.value='';
+spellbook[activeCharacter].push({id:crypto.randomUUID(),name:d.name,url:url(d.name),cast:cast(d.casting_time),range:d.range,duration:d.duration,level:lvl(d.level),rp:false,desc:(d.desc||[]).join('\\n')});
+save();input.value='';
 }catch{
 document.getElementById('errorMsg').textContent='Spell not found';
 setTimeout(()=>document.getElementById('errorMsg').textContent='',2000);
@@ -226,6 +207,7 @@ document.getElementById('addSpellBtn').onclick=add;
 document.getElementById('spellInput').onkeydown=e=>{if(e.key==='Enter')add()};
 
 tabs();
+filtersUI();
 </script>
 </body>
 </html>
