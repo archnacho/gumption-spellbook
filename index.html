@@ -58,9 +58,14 @@ th{cursor:pointer;color:#dcd6ff}
 .modal.open{display:flex}
 .modal-content{background:#202442;padding:20px;border-radius:16px;max-width:700px;width:100%}
 
-/* Floating buttons */
-.floating-left{position:fixed;bottom:16px;left:16px}
-.floating-right{position:fixed;bottom:16px;right:16px}
+/* Footer buttons */
+.panel-footer{
+display:flex;
+justify-content:space-between;
+margin-top:16px;
+gap:10px;
+flex-wrap:wrap;
+}
 
 /* Mobile */
 @media (max-width:768px){
@@ -74,6 +79,9 @@ h1{font-size:20px}
 table{display:block;overflow-x:auto;white-space:nowrap}
 th,td{font-size:12px;padding:8px}
 .modal-content{margin:10px;max-height:90vh;overflow:auto}
+.panel-footer{flex-direction:column}
+.panel-footer button,
+.panel-footer label{width:100%}
 }
 </style>
 </head>
@@ -103,16 +111,17 @@ th,td{font-size:12px;padding:8px}
 <tbody id="spellTableBody"></tbody>
 </table>
 
-</div>
-</div>
+<!-- ✅ FOOTER BUTTONS -->
+<div class="panel-footer">
+<button class="primary-btn" id="customBtn">+ Custom Spell</button>
 
-<!-- Custom Spell Button -->
-<button class="primary-btn floating-left" id="customBtn">+ Custom Spell</button>
-
-<!-- Import CSV -->
-<div class="floating-right">
-<label class="primary-btn" for="csvFile">Import CSV</label>
+<label class="primary-btn" for="csvFile" style="text-align:center">
+Import CSV
+</label>
 <input id="csvFile" type="file" accept=".csv" style="display:none">
+</div>
+
+</div>
 </div>
 
 <!-- Modal -->
@@ -250,59 +259,6 @@ b.appendChild(tr);
 document.querySelector('.add-row').style.display=showRPView?'none':'grid';
 filtersUI();
 }
-
-function open(sp){
-window.currentModalSpell=sp;
-document.getElementById('modalTitle').textContent=sp.name;
-document.getElementById('modalDesc').textContent=sp.desc;
-document.getElementById('modalStats').innerHTML=`<div>Cast: ${sp.cast}</div><div>Range: ${sp.range}</div><div>Duration: ${sp.duration}</div><div>Level: ${sp.level}</div>`;
-document.getElementById('spellModal').classList.add('open');
-}
-
-document.getElementById('spellModal').onclick=e=>{
-if(e.target.id==='spellModal'){document.getElementById('spellModal').classList.remove('open');}
-};
-
-document.getElementById('deleteFromModal').onclick=()=>{
-const sp=window.currentModalSpell;
-spellbook[activeCharacter]=spellbook[activeCharacter].filter(x=>x.id!==sp.id);
-save();
-document.getElementById('spellModal').classList.remove('open');
-};
-
-async function add(){
-const input=document.getElementById('spellInput');
-const n=input.value.trim();
-if(!n)return;
-
-const s=n.toLowerCase().replace(/\s+/g,'-');
-
-try{
-const r=await fetch(`https://www.dnd5eapi.co/api/spells/${s}`);
-if(!r.ok)throw'';
-const d=await r.json();
-
-spellbook[activeCharacter].push({
-id:crypto.randomUUID(),
-name:d.name,
-cast:d.casting_time.includes('bonus')?'BA':d.casting_time.includes('reaction')?'R':'A',
-range:d.range,
-duration:d.duration,
-level:d.level===0?'C':d.level,
-rp:false,
-desc:(d.desc||[]).join('\\n')
-});
-
-save();
-input.value='';
-}catch{
-document.getElementById('errorMsg').textContent='Spell not found';
-setTimeout(()=>document.getElementById('errorMsg').textContent='',2000);
-}
-}
-
-document.getElementById('addSpellBtn').onclick=add;
-document.getElementById('spellInput').onkeydown=e=>{if(e.key==='Enter')add()};
 
 tabs();
 </script>
