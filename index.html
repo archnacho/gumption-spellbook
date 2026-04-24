@@ -4,52 +4,29 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Gumption Spellbook</title>
-
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-
 <style>
-:root{--bg:#0f1020;--bg2:#181a2f;--accent:#7c5cff;--text:#f4f1ff;--muted:#b9b4d9;--border:rgba(255,255,255,0.08);}
-*{box-sizing:border-box}
-body{margin:0;font-family:Inter,system-ui;background:radial-gradient(circle at top,#1d1f3f,#070811);color:var(--text)}
-.container{max-width:1200px;margin:auto;padding:24px}
-h1{text-align:center;margin-bottom:20px}
-
-.tabs{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-bottom:20px}
-.tab{padding:10px 16px;border-radius:999px;background:#1c1f3a;border:1px solid var(--border);cursor:pointer}
-.tab.active{background:linear-gradient(135deg,#7c5cff,#5b7cff)}
-
-.panel{background:var(--bg2);padding:20px;border-radius:16px}
-
+:root{--bg:#0f1020;--bg2:#181a2f;--card:#202442;--accent:#7c5cff;--text:#f4f1ff;--muted:#b9b4d9;--danger:#ff5d73;--border:rgba(255,255,255,0.08);}*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui;background:radial-gradient(circle at top,#1d1f3f,#070811);color:var(--text)}.container{max-width:1200px;margin:auto;padding:24px}h1{text-align:center;margin-bottom:20px}.tabs{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-bottom:20px}.tab{padding:10px 16px;border-radius:999px;background:#181a2f;border:1px solid var(--border);cursor:pointer;color:var(--text)}.tab.active{background:linear-gradient(135deg,#7c5cff,#5b7cff);color:#fff;border-color:transparent}.panel{background:var(--bg2);padding:20px;border-radius:16px}
 .add-row{display:grid;grid-template-columns:1fr auto;gap:10px;margin-bottom:10px}
-
-input,select{padding:10px;border-radius:10px;border:1px solid var(--border);background:#121427;color:white}
-
-button{padding:10px;border:none;border-radius:10px;cursor:pointer}
+input{padding:12px;border-radius:10px;border:1px solid var(--border);background:#121427;color:white}
+button{padding:12px;border:none;border-radius:10px;cursor:pointer}
 .primary-btn{background:var(--accent);color:white}
-
-.filter-bar{display:flex;justify-content:space-between;margin-bottom:12px}
-.filter-btn{padding:6px 10px;border-radius:999px;background:#121427;border:1px solid var(--border)}
-.filter-btn.active{background:var(--accent)}
-
-table{width:100%;border-collapse:collapse}
-th,td{padding:10px;border-bottom:1px solid rgba(255,255,255,0.05)}
-th{cursor:pointer}
-
+.error-msg{color:#ff9cac;height:20px}
+.filter-bar{display:flex;justify-content:space-between;margin-bottom:10px}
+.filter-btn{padding:6px 10px;border-radius:999px;background:#121427;color:var(--muted);border:1px solid var(--border)}
+.filter-btn.active{background:var(--accent);color:white}
+table{width:100%;border-collapse:collapse}th,td{padding:10px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:center}
+th:first-child, td:first-child{text-align:left}
+th:nth-child(2), td:nth-child(2){text-align:left}
 .spell-link{cursor:pointer;color:#d8ccff}
-
 .modal{position:fixed;inset:0;background:rgba(0,0,0,0.7);display:none;align-items:center;justify-content:center}
 .modal.open{display:flex}
-.modal-content{background:#202442;padding:20px;border-radius:16px;width:100%;max-width:500px}
-
-.panel-footer{display:flex;justify-content:space-between;margin-top:16px;gap:10px}
+.modal-content{background:#202442;padding:20px;border-radius:16px;max-width:700px;width:100%}
+th{cursor:pointer}
 </style>
 </head>
-
 <body>
 <div class="container">
 <h1>📖 Gumption Spellbook</h1>
-
 <div class="tabs" id="tabs"></div>
 
 <div class="panel">
@@ -58,262 +35,235 @@ th{cursor:pointer}
 <input id="spellInput" placeholder="Enter spell">
 <button id="addSpellBtn" class="primary-btn">Add</button>
 </div>
-
+<div id="errorMsg" class="error-msg"></div>
 <div class="filter-bar">
 <div id="castFilters"></div>
 <div id="rpFilters"></div>
 </div>
-
 <table>
-<thead><tr id="tableHead"></tr></thead>
+<thead><tr></tr></thead>
 <tbody id="spellTableBody"></tbody>
 </table>
 
-<div class="panel-footer">
-<button class="primary-btn" id="customBtn">+ Custom Spell</button>
-<label class="primary-btn" for="csvFile">Import CSV</label>
+<button id="addCustomBtn" style="position:fixed;bottom:16px;left:16px;background:var(--accent);color:white;border-radius:999px;padding:12px 16px;font-size:16px;display:flex;align-items:center;gap:8px;">
+<span style="font-size:20px;">+</span>
+<span>Custom Spell</span>
+</button>
+
+<div style="position:fixed;bottom:16px;right:16px;z-index:50;">
+<label for="csvFile" class="primary-btn" style="cursor:pointer">Import CSV</label>
 <input id="csvFile" type="file" accept=".csv" style="display:none">
 </div>
 
 </div>
 </div>
 
-<!-- SPELL MODAL -->
-<div class="modal" id="spellModal">
-<div class="modal-content">
-<div style="display:flex;justify-content:space-between;">
-<h2 id="modalTitle"></h2>
-<button id="deleteFromModal">🗑️</button>
-</div>
-<div id="modalStats"></div>
-<div id="modalDesc"></div>
-</div>
-</div>
-
-<!-- CUSTOM SPELL MODAL -->
 <div class="modal" id="customModal">
 <div class="modal-content">
 <h2>Add Custom Spell</h2>
-
-<input id="cName" placeholder="Name">
-
-<select id="cCast">
-<option>A</option><option>BA</option><option>R</option>
+<input id="customName" placeholder="Name" style="width:100%;margin-bottom:10px">
+<select id="customCast"><option>A</option><option>BA</option><option>R</option></select>
+<select id="customRange">
+<option>Self</option><option>Touch</option><option>10 feet</option><option>20 feet</option><option>30 feet</option><option>40 feet</option><option>50 feet</option><option>60 feet</option><option>90 feet</option><option>120 feet</option><option>Over 120</option>
 </select>
-
-<select id="cRange">
-<option>Self</option><option>Touch</option><option>10 feet</option><option>30 feet</option><option>60 feet</option><option>120 feet</option>
-</select>
-
-<select id="cDuration">
+<select id="customDuration">
 <option>1 round</option><option>1 minute</option><option>10 minutes</option><option>1 hour</option>
 </select>
-
-<select id="cLevel">
+<select id="customLevel">
 <option>C</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option>
 </select>
-
-<label><input type="checkbox" id="cRP"> RP</label>
-
-<textarea id="cDesc" placeholder="Description" style="margin-top:10px;width:100%;height:80px;"></textarea>
-
-<div style="margin-top:10px;display:flex;gap:10px;">
-<button class="primary-btn" id="saveCustom">Save</button>
+<label><input type="checkbox" id="customRP"> RP</label>
+<div style="margin-top:10px">
+<button id="saveCustom" class="primary-btn">Save</button>
 <button id="closeCustom">Cancel</button>
 </div>
-
 </div>
 </div>
 
+<div class="modal" id="spellModal">
+<div class="modal-content">
+
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+<h2 id="modalTitle" style="margin:0;"></h2>
+<button id="deleteFromModal" style="background:transparent;border:none;color:#ff9cac;font-size:18px;cursor:pointer">🗑️</button>
+</div>
+
+<div id="modalStats" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px"></div>
+<div id="modalDesc"></div>
+
+</div>
+</div>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js"></script>
 <script>
-const firebaseConfig={
-apiKey:"AIzaSyD6BdFsQ0x93JuJjCeeaZjB5ASpuTw-ALw",
-authDomain:"gumption-spellbook.firebaseapp.com",
-projectId:"gumption-spellbook"
-};
-firebase.initializeApp(firebaseConfig);
-const db=firebase.firestore();
-
 const CHARACTERS=['Candy Calderón','Cooper Howard','Deekin Rush','Kuz Rakata','Percy Fireside'];
-
+const STORAGE_KEY='gumptionSpellbook';
 let activeCharacter=CHARACTERS[0];
 let showRPView=false;
 let filters={cast:'All',rp:'All RP'};
-let spellbook={};
-let isLoaded=false;
+let spellbook=load();
 let csvIndex={};
 
-function initStructure(){const d={};CHARACTERS.forEach(c=>d[c]=[]);return d;}
+let sortState={column:'name',direction:'asc'};
 
-db.collection('spellbook').doc('shared').onSnapshot(doc=>{
-spellbook=doc.exists?doc.data():initStructure();
-isLoaded=true;
-render();
-});
-
-function save(){
-if(!isLoaded)return;
-db.collection('spellbook').doc('shared').set(spellbook,{merge:true});
-}
-
+function load(){const s=JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}');const d={};CHARACTERS.forEach(c=>d[c]=s[c]||[]);return d}
+function save(){localStorage.setItem(STORAGE_KEY,JSON.stringify(spellbook))}
 function slug(s){return s.trim().toLowerCase().replace(/\s+/g,'-')}
 function cast(c){c=c.toLowerCase();if(c.includes('bonus'))return'BA';if(c.includes('reaction'))return'R';return'A'}
 function lvl(l){return l==0?'C':l}
+function url(n){return`https://www.dndbeyond.com/spells/${slug(n)}`}
 
-////////////////////////////////
-// CUSTOM SPELL
-////////////////////////////////
+function tabs(){const t=document.getElementById('tabs');t.innerHTML='';
+CHARACTERS.forEach(c=>{const b=document.createElement('button');b.className='tab '+(!showRPView&&c===activeCharacter?'active':'');b.textContent=c;b.onclick=()=>{activeCharacter=c;showRPView=false;tabs();render()};t.appendChild(b)});
+const rp=document.createElement('button');rp.className='tab '+(showRPView?'active':'');rp.textContent='RP';rp.onclick=()=>{showRPView=true;tabs();render()};t.appendChild(rp)}
 
-customBtn.onclick=()=>customModal.classList.add('open');
-closeCustom.onclick=()=>customModal.classList.remove('open');
+function filtersUI(){const castOpts=['All','A','BA','R'];const rpOpts=['All RP','RP Only','Hide RP'];
+const c=document.getElementById('castFilters');const r=document.getElementById('rpFilters');c.innerHTML='';r.innerHTML='';
+castOpts.forEach(o=>{const b=document.createElement('button');b.className='filter-btn '+(filters.cast===o?'active':'');b.textContent=o;b.onclick=()=>{filters.cast=o;filtersUI();render()};c.appendChild(b)});
+rpOpts.forEach(o=>{const b=document.createElement('button');b.className='filter-btn '+(filters.rp===o?'active':'');b.textContent=o;b.onclick=()=>{filters.rp=o;filtersUI();render()};r.appendChild(b)})}
 
-saveCustom.onclick=()=>{
-const name=cName.value.trim();
-if(!name)return;
+function setSort(col){
+if(sortState.column===col){
+sortState.direction=sortState.direction==='asc'?'desc':'asc';
+}else{
+sortState.column=col;
+sortState.direction='asc';
+}
+render();
+}
 
-spellbook[activeCharacter].push({
-id:crypto.randomUUID(),
-name,
-cast:cCast.value,
-range:cRange.value,
-duration:cDuration.value,
-level:cLevel.value,
-rp:cRP.checked,
-desc:cDesc.value
+function getSpells(){
+let s;
+if(showRPView){
+s=[];
+CHARACTERS.forEach(c=>{spellbook[c].forEach(sp=>{if(sp.rp)s.push({...sp,character:c})})});
+}else{
+s=[...spellbook[activeCharacter]];
+if(filters.cast!=='All')s=s.filter(x=>x.cast===filters.cast);
+if(filters.rp==='RP Only')s=s.filter(x=>x.rp);
+if(filters.rp==='Hide RP')s=s.filter(x=>!x.rp);
+}
+
+function val(sp,col){
+if(col==='name')return sp.name;
+if(col==='cast')return sp.cast;
+if(col==='range')return sp.range;
+if(col==='duration')return sp.duration;
+if(col==='level')return sp.level==='C'?0:Number(sp.level);
+if(col==='rp')return sp.rp?1:0;
+return '';
+}
+
+s.sort((a,b)=>{
+let A=val(a,sortState.column);
+let B=val(b,sortState.column);
+if(A<B)return sortState.direction==='asc'?-1:1;
+if(A>B)return sortState.direction==='asc'?1:-1;
+return a.name.localeCompare(b.name);
 });
 
-save();
-customModal.classList.remove('open');
-};
-
-////////////////////////////////
-// CSV IMPORT
-////////////////////////////////
-
-function parseCSV(text){
-const lines=text.split(/\r?\n/);
-const headers=lines[0].split(',');
-
-const index={};
-
-for(let i=1;i<lines.length;i++){
-const values=lines[i].split(',');
-const row={};
-headers.forEach((h,j)=>row[h.trim()]=values[j]?.trim());
-
-if(row.Name)index[slug(row.Name)]=row;
-}
-return index;
+return s;
 }
 
-csvFile.onchange=async e=>{
-const file=e.target.files[0];
-if(!file)return;
-csvIndex=parseCSV(await file.text());
-console.log("CSV Loaded",csvIndex);
+function render(){
+const b=document.getElementById('spellTableBody');
+const s=getSpells();
+b.innerHTML='';
+const head=document.querySelector('thead tr');
+
+if(showRPView){
+head.innerHTML=`
+<th onclick="setSort('character')">Character</th>
+<th onclick="setSort('name')">Name</th>
+<th onclick="setSort('cast')">Cast</th>
+<th onclick="setSort('range')">Range</th>
+<th onclick="setSort('duration')">Duration</th>
+<th onclick="setSort('level')">Lvl</th>`;
+}else{
+head.innerHTML=`
+<th onclick="setSort('name')">Name</th>
+<th onclick="setSort('cast')">Cast</th>
+<th onclick="setSort('range')">Range</th>
+<th onclick="setSort('duration')">Duration</th>
+<th onclick="setSort('level')">Lvl</th>
+<th onclick="setSort('rp')">RP</th>`;
+}
+
+if(!s.length){b.innerHTML='<tr><td colspan=7>No spells</td></tr>';return;}
+
+s.forEach(sp=>{
+const tr=document.createElement('tr');
+if(showRPView){
+tr.innerHTML=`<td>${sp.character}</td><td><span class="spell-link">${sp.name}</span></td><td>${sp.cast}</td><td>${sp.range}</td><td>${sp.duration}</td><td>${sp.level}</td>`;
+tr.querySelector('.spell-link').onclick=()=>open(sp);
+}else{
+tr.innerHTML=`<td><span class="spell-link">${sp.name}</span></td><td>${sp.cast}</td><td>${sp.range}</td><td>${sp.duration}</td><td>${sp.level}</td><td><input type="checkbox" ${sp.rp?'checked':''}></td>`;
+tr.querySelector('.spell-link').onclick=()=>open(sp);
+tr.querySelector('input').onchange=e=>{sp.rp=e.target.checked;save();render()};
+}
+b.appendChild(tr);
+});
+
+document.querySelector('.add-row').style.display=showRPView?'none':'grid';
+}
+
+function open(sp){
+window.currentModalSpell=sp;
+document.getElementById('modalTitle').textContent=sp.name;
+document.getElementById('modalDesc').textContent=sp.desc;
+document.getElementById('modalStats').innerHTML=`
+<div><b>Cast:</b> ${sp.cast}</div>
+<div><b>Range:</b> ${sp.range}</div>
+<div><b>Duration:</b> ${sp.duration}</div>
+<div><b>Level:</b> ${sp.level}</div>`;
+document.getElementById('spellModal').classList.add('open');
+}
+
+document.getElementById('spellModal').addEventListener('click',e=>{
+if(e.target.id==='spellModal'){
+document.getElementById('spellModal').classList.remove('open');
+}
+});
+
+document.getElementById('deleteFromModal').onclick=()=>{
+const sp=window.currentModalSpell;
+spellbook[activeCharacter]=spellbook[activeCharacter].filter(x=>x.id!==sp.id);
+save();render();
+document.getElementById('spellModal').classList.remove('open');
 };
 
-////////////////////////////////
-// ADD SPELL
-////////////////////////////////
+function parseCSV(t){const l=t.split(/\n/);const h=l[0].split(',');const idx={};for(let i=1;i<l.length;i++){const v=l[i].split(',');const row={};h.forEach((k,j)=>row[k]=v[j]);if(row.Name)idx[slug(row.Name)]=row}return idx}
+document.getElementById('csvFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;csvIndex=parseCSV(await f.text())};
 
 async function add(){
-const name=spellInput.value.trim();
-if(!name)return;
-
-const s=slug(name);
-
+const input=document.getElementById('spellInput');
+const n=input.value.trim();
+if(!n)return;
+const s=slug(n);
 try{
 const r=await fetch(`https://www.dnd5eapi.co/api/spells/${s}`);
-if(!r.ok)throw '';
-
+if(!r.ok)throw'';
 const d=await r.json();
-
-spellbook[activeCharacter].push({
-id:crypto.randomUUID(),
-name:d.name,
-cast:cast(d.casting_time),
-range:d.range,
-duration:d.duration,
-level:lvl(d.level),
-rp:false,
-desc:(d.desc||[]).join('\n')
-});
-
-save();
-spellInput.value='';
-return;
-
+spellbook[activeCharacter].push({id:crypto.randomUUID(),name:d.name,url:url(d.name),cast:cast(d.casting_time),range:d.range,duration:d.duration,level:lvl(d.level),rp:false,desc:(d.desc||[]).join('\n')});
+save();input.value='';render();
 }catch{
 const c=csvIndex[s];
 if(c){
-spellbook[activeCharacter].push({
-id:crypto.randomUUID(),
-name:c.Name,
-cast:cast(c['Casting Time']||'1 action'),
-range:c.Range,
-duration:c.Duration,
-level:lvl(c.Level||0),
-rp:false,
-desc:c.Details||''
-});
-save();
-spellInput.value='';
-return;
+spellbook[activeCharacter].push({id:crypto.randomUUID(),name:c.Name,url:url(c.Name),cast:cast(c['Casting Time']||'1 action'),range:c.Range,duration:c.Duration,level:lvl(c.Level||0),rp:false,desc:c.Details||''});
+save();input.value='';render();
+}else{
+document.getElementById('errorMsg').textContent='Spell not found';
+setTimeout(()=>document.getElementById('errorMsg').textContent='',2000);
 }
-
-alert("Spell not found");
 }
 }
 
-addSpellBtn.onclick=add;
-spellInput.onkeydown=e=>{if(e.key==='Enter')add()};
-
-////////////////////////////////
-// RENDER
-////////////////////////////////
-
-function render(){
-const b=spellTableBody;
-const head=tableHead;
-
-head.innerHTML='<th>Name</th><th>Cast</th><th>Range</th><th>Duration</th><th>Lvl</th><th>RP</th>';
-
-b.innerHTML='';
-
-(spellbook[activeCharacter]||[]).forEach(sp=>{
-const tr=document.createElement('tr');
-tr.innerHTML=`
-<td><span class="spell-link">${sp.name}</span></td>
-<td>${sp.cast}</td>
-<td>${sp.range}</td>
-<td>${sp.duration}</td>
-<td>${sp.level}</td>
-<td><input type="checkbox" ${sp.rp?'checked':''}></td>
-`;
-
-tr.querySelector('input').onchange=e=>{
-sp.rp=e.target.checked;
-save();
-};
-
-b.appendChild(tr);
-});
-}
+document.getElementById('addSpellBtn').onclick=add;
+document.getElementById('spellInput').onkeydown=e=>{if(e.key==='Enter')add()};
 
 tabs();
-
-function tabs(){
-const t=document.getElementById('tabs');
-t.innerHTML='';
-CHARACTERS.forEach(c=>{
-const b=document.createElement('button');
-b.className='tab '+(c===activeCharacter?'active':'');
-b.textContent=c;
-b.onclick=()=>{activeCharacter=c;tabs();render()};
-t.appendChild(b);
-});
-}
+filtersUI();
+render();
 </script>
 </body>
 </html>
