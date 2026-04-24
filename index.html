@@ -16,30 +16,73 @@ body{margin:0;font-family:Inter,system-ui;background:radial-gradient(circle at t
 h1{text-align:center;margin-bottom:20px}
 
 .tabs{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-bottom:20px}
-.tab{padding:10px 16px;border-radius:999px;background:#1c1f3a;border:1px solid var(--border);cursor:pointer}
+.tab{padding:10px 16px;border-radius:999px;background:#1c1f3a;border:1px solid var(--border);cursor:pointer;color:var(--text)}
 .tab.active{background:linear-gradient(135deg,#7c5cff,#5b7cff);color:white;border:none}
 
 .panel{background:var(--bg2);padding:20px;border-radius:16px}
 
 .add-row{display:grid;grid-template-columns:1fr auto;gap:10px;margin-bottom:10px}
-input,select{padding:10px;border-radius:10px;border:1px solid var(--border);background:#121427;color:white;width:100%}
 
-button{padding:10px;border:none;border-radius:10px;cursor:pointer}
+input{padding:12px;border-radius:10px;border:1px solid var(--border);background:#121427;color:white}
+
+button{padding:10px 14px;border:none;border-radius:10px;cursor:pointer}
+
 .primary-btn{background:var(--accent);color:white}
 
+.error-msg{color:#ff9cac;height:20px}
+
 .filter-bar{display:flex;justify-content:space-between;margin-bottom:12px}
-.filter-btn{padding:6px 10px;border-radius:999px;background:#121427;border:1px solid var(--border);cursor:pointer}
-.filter-btn.active{background:var(--accent)}
+
+.filter-btn{
+padding:6px 10px;
+border-radius:999px;
+background:#121427;
+color:var(--muted);
+border:1px solid var(--border);
+cursor:pointer;
+}
+.filter-btn.active{
+background:var(--accent);
+color:white;
+}
 
 table{width:100%;border-collapse:collapse}
-th,td{padding:10px;border-bottom:1px solid rgba(255,255,255,0.05)}
-th{cursor:pointer}
+th,td{padding:10px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:center}
+th:first-child, td:first-child{text-align:left}
+th:nth-child(2), td:nth-child(2){text-align:left}
+th{cursor:pointer;color:#dcd6ff}
+
+.spell-link{cursor:pointer;color:#d8ccff}
 
 .modal{position:fixed;inset:0;background:rgba(0,0,0,0.7);display:none;align-items:center;justify-content:center}
 .modal.open{display:flex}
-.modal-content{background:#202442;padding:20px;border-radius:16px;width:100%;max-width:500px}
+.modal-content{background:#202442;padding:20px;border-radius:16px;max-width:700px;width:100%}
 
-.panel-footer{display:flex;justify-content:space-between;margin-top:16px;gap:10px}
+/* Footer buttons */
+.panel-footer{
+display:flex;
+justify-content:space-between;
+margin-top:16px;
+gap:10px;
+flex-wrap:wrap;
+}
+
+/* Mobile */
+@media (max-width:768px){
+.container{padding:16px}
+h1{font-size:20px}
+.tabs{gap:6px}
+.tab{padding:8px 12px;font-size:12px}
+.add-row{grid-template-columns:1fr}
+#addSpellBtn{width:100%}
+.filter-bar{flex-direction:column;gap:10px}
+table{display:block;overflow-x:auto;white-space:nowrap}
+th,td{font-size:12px;padding:8px}
+.modal-content{margin:10px;max-height:90vh;overflow:auto}
+.panel-footer{flex-direction:column}
+.panel-footer button,
+.panel-footer label{width:100%}
+}
 </style>
 </head>
 
@@ -56,6 +99,8 @@ th{cursor:pointer}
 <button id="addSpellBtn" class="primary-btn">Add</button>
 </div>
 
+<div id="errorMsg" class="error-msg"></div>
+
 <div class="filter-bar">
 <div id="castFilters"></div>
 <div id="rpFilters"></div>
@@ -66,68 +111,53 @@ th{cursor:pointer}
 <tbody id="spellTableBody"></tbody>
 </table>
 
+<!-- ✅ FOOTER BUTTONS -->
 <div class="panel-footer">
 <button class="primary-btn" id="customBtn">+ Custom Spell</button>
-<label class="primary-btn" for="csvFile">Import CSV</label>
-<input id="csvFile" type="file" style="display:none">
+
+<label class="primary-btn" for="csvFile" style="text-align:center">
+Import CSV
+</label>
+<input id="csvFile" type="file" accept=".csv" style="display:none">
 </div>
 
 </div>
 </div>
 
-<!-- CUSTOM SPELL MODAL -->
-<div class="modal" id="customModal">
+<!-- Modal -->
+<div class="modal" id="spellModal">
 <div class="modal-content">
-<h2>Add Custom Spell</h2>
-
-<input id="cName" placeholder="Name">
-
-<select id="cCast">
-<option>A</option>
-<option>BA</option>
-<option>R</option>
-</select>
-
-<select id="cRange">
-<option>Self</option><option>Touch</option><option>30 feet</option><option>60 feet</option><option>120 feet</option>
-</select>
-
-<select id="cDuration">
-<option>1 round</option><option>1 minute</option><option>10 minutes</option><option>1 hour</option>
-</select>
-
-<select id="cLevel">
-<option>C</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option>
-</select>
-
-<label><input type="checkbox" id="cRP"> RP</label>
-
-<div style="margin-top:10px;display:flex;gap:10px;">
-<button class="primary-btn" id="saveCustom">Save</button>
-<button id="closeCustom">Cancel</button>
+<div style="display:flex;justify-content:space-between;">
+<h2 id="modalTitle"></h2>
+<button id="deleteFromModal">🗑️</button>
 </div>
-
+<div id="modalStats"></div>
+<div id="modalDesc"></div>
 </div>
 </div>
 
 <script>
-const firebaseConfig={
-apiKey:"AIzaSy...",
+const firebaseConfig = {
+apiKey:"AIzaSyD6BdFsQ0x93JuJjCeeaZjB5ASpuTw-ALw",
 authDomain:"gumption-spellbook.firebaseapp.com",
 projectId:"gumption-spellbook"
 };
+
 firebase.initializeApp(firebaseConfig);
-const db=firebase.firestore();
+const db = firebase.firestore();
 
 const CHARACTERS=['Candy Calderón','Cooper Howard','Deekin Rush','Kuz Rakata','Percy Fireside'];
+
 let activeCharacter=CHARACTERS[0];
+let showRPView=false;
+let filters={cast:'All',rp:'All RP'};
 let spellbook={};
 let isLoaded=false;
 
 function initStructure(){const d={};CHARACTERS.forEach(c=>d[c]=[]);return d;}
 
 db.collection('spellbook').doc('shared').onSnapshot(doc=>{
-spellbook=doc.exists?doc.data():initStructure();
+spellbook = doc.exists ? doc.data() : initStructure();
 isLoaded=true;
 render();
 });
@@ -137,30 +167,100 @@ if(!isLoaded)return;
 db.collection('spellbook').doc('shared').set(spellbook,{merge:true});
 }
 
-document.getElementById('customBtn').onclick=()=>{
-document.getElementById('customModal').classList.add('open');
-};
+function tabs(){
+const t=document.getElementById('tabs');t.innerHTML='';
+CHARACTERS.forEach(c=>{
+const b=document.createElement('button');
+b.className='tab '+(!showRPView&&c===activeCharacter?'active':'');
+b.textContent=c;
+b.onclick=()=>{activeCharacter=c;showRPView=false;tabs();render()};
+t.appendChild(b);
+});
+const rp=document.createElement('button');
+rp.className='tab '+(showRPView?'active':'');
+rp.textContent='RP';
+rp.onclick=()=>{showRPView=true;tabs();render()};
+t.appendChild(rp);
+}
 
-document.getElementById('closeCustom').onclick=()=>{
-document.getElementById('customModal').classList.remove('open');
-};
+function filtersUI(){
+const castOpts=['All','A','BA','R'];
+const rpOpts=['All RP','RP Only','Hide RP'];
 
-document.getElementById('saveCustom').onclick=()=>{
-const spell={
-id:crypto.randomUUID(),
-name:document.getElementById('cName').value,
-cast:document.getElementById('cCast').value,
-range:document.getElementById('cRange').value,
-duration:document.getElementById('cDuration').value,
-level:document.getElementById('cLevel').value,
-rp:document.getElementById('cRP').checked,
-desc:"Custom spell"
-};
+const c=document.getElementById('castFilters');
+const r=document.getElementById('rpFilters');
 
-spellbook[activeCharacter].push(spell);
-save();
+c.innerHTML='';r.innerHTML='';
 
-document.getElementById('customModal').classList.remove('open');
-};
+castOpts.forEach(o=>{
+const b=document.createElement('button');
+b.className='filter-btn '+(filters.cast===o?'active':'');
+b.textContent=o;
+b.onclick=()=>{filters.cast=o;filtersUI();render()};
+c.appendChild(b);
+});
 
-function
+rpOpts.forEach(o=>{
+const b=document.createElement('button');
+b.className='filter-btn '+(filters.rp===o?'active':'');
+b.textContent=o;
+b.onclick=()=>{filters.rp=o;filtersUI();render()};
+r.appendChild(b);
+});
+}
+
+function getSpells(){
+if(showRPView){
+let all=[];
+CHARACTERS.forEach(c=>{
+(spellbook[c]||[]).forEach(s=>{
+if(s.rp)all.push({...s,character:c});
+});
+});
+return all;
+}
+
+let s=[...(spellbook[activeCharacter]||[])];
+
+if(filters.cast!=='All')s=s.filter(x=>x.cast===filters.cast);
+if(filters.rp==='RP Only')s=s.filter(x=>x.rp);
+if(filters.rp==='Hide RP')s=s.filter(x=>!x.rp);
+
+return s;
+}
+
+function render(){
+const b=document.getElementById('spellTableBody');
+const head=document.getElementById('tableHead');
+
+if(showRPView){
+head.innerHTML='<th>Character</th><th>Name</th><th>Cast</th><th>Range</th><th>Duration</th><th>Lvl</th>';
+}else{
+head.innerHTML='<th>Name</th><th>Cast</th><th>Range</th><th>Duration</th><th>Lvl</th><th>RP</th>';
+}
+
+b.innerHTML='';
+
+getSpells().forEach(sp=>{
+const tr=document.createElement('tr');
+
+if(showRPView){
+tr.innerHTML=`<td>${sp.character}</td><td><span class="spell-link">${sp.name}</span></td><td>${sp.cast}</td><td>${sp.range}</td><td>${sp.duration}</td><td>${sp.level}</td>`;
+}else{
+tr.innerHTML=`<td><span class="spell-link">${sp.name}</span></td><td>${sp.cast}</td><td>${sp.range}</td><td>${sp.duration}</td><td>${sp.level}</td><td><input type="checkbox" ${sp.rp?'checked':''}></td>`;
+tr.querySelector('input').onchange=e=>{sp.rp=e.target.checked;save();};
+}
+
+tr.querySelector('.spell-link').onclick=()=>open(sp);
+
+b.appendChild(tr);
+});
+
+document.querySelector('.add-row').style.display=showRPView?'none':'grid';
+filtersUI();
+}
+
+tabs();
+</script>
+</body>
+</html>
