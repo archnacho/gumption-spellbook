@@ -16,19 +16,8 @@ body{margin:0;font-family:Inter,system-ui;background:radial-gradient(circle at t
 h1{text-align:center;margin-bottom:20px}
 
 .tabs{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-bottom:20px}
-.tab{
-padding:10px 16px;
-border-radius:999px;
-background:#1c1f3a;
-border:1px solid var(--border);
-cursor:pointer;
-color:var(--text);
-}
-.tab.active{
-background:linear-gradient(135deg,#7c5cff,#5b7cff);
-color:white;
-border:none;
-}
+.tab{padding:10px 16px;border-radius:999px;background:#1c1f3a;border:1px solid var(--border);cursor:pointer;color:var(--text)}
+.tab.active{background:linear-gradient(135deg,#7c5cff,#5b7cff);color:white;border:none}
 
 .panel{background:var(--bg2);padding:20px;border-radius:16px}
 
@@ -68,6 +57,24 @@ th{cursor:pointer;color:#dcd6ff}
 .modal{position:fixed;inset:0;background:rgba(0,0,0,0.7);display:none;align-items:center;justify-content:center}
 .modal.open{display:flex}
 .modal-content{background:#202442;padding:20px;border-radius:16px;max-width:700px;width:100%}
+
+/* Floating buttons */
+.floating-left{position:fixed;bottom:16px;left:16px}
+.floating-right{position:fixed;bottom:16px;right:16px}
+
+/* Mobile */
+@media (max-width:768px){
+.container{padding:16px}
+h1{font-size:20px}
+.tabs{gap:6px}
+.tab{padding:8px 12px;font-size:12px}
+.add-row{grid-template-columns:1fr}
+#addSpellBtn{width:100%}
+.filter-bar{flex-direction:column;gap:10px}
+table{display:block;overflow-x:auto;white-space:nowrap}
+th,td{font-size:12px;padding:8px}
+.modal-content{margin:10px;max-height:90vh;overflow:auto}
+}
 </style>
 </head>
 
@@ -99,6 +106,16 @@ th{cursor:pointer;color:#dcd6ff}
 </div>
 </div>
 
+<!-- Custom Spell Button -->
+<button class="primary-btn floating-left" id="customBtn">+ Custom Spell</button>
+
+<!-- Import CSV -->
+<div class="floating-right">
+<label class="primary-btn" for="csvFile">Import CSV</label>
+<input id="csvFile" type="file" accept=".csv" style="display:none">
+</div>
+
+<!-- Modal -->
 <div class="modal" id="spellModal">
 <div class="modal-content">
 <div style="display:flex;justify-content:space-between;">
@@ -128,9 +145,7 @@ let filters={cast:'All',rp:'All RP'};
 let spellbook={};
 let isLoaded=false;
 
-function initStructure(){
-const d={};CHARACTERS.forEach(c=>d[c]=[]);return d;
-}
+function initStructure(){const d={};CHARACTERS.forEach(c=>d[c]=[]);return d;}
 
 db.collection('spellbook').doc('shared').onSnapshot(doc=>{
 spellbook = doc.exists ? doc.data() : initStructure();
@@ -221,24 +236,10 @@ getSpells().forEach(sp=>{
 const tr=document.createElement('tr');
 
 if(showRPView){
-tr.innerHTML=`
-<td>${sp.character}</td>
-<td><span class="spell-link">${sp.name}</span></td>
-<td>${sp.cast}</td>
-<td>${sp.range}</td>
-<td>${sp.duration}</td>
-<td>${sp.level}</td>`;
+tr.innerHTML=`<td>${sp.character}</td><td><span class="spell-link">${sp.name}</span></td><td>${sp.cast}</td><td>${sp.range}</td><td>${sp.duration}</td><td>${sp.level}</td>`;
 }else{
-tr.innerHTML=`
-<td><span class="spell-link">${sp.name}</span></td>
-<td>${sp.cast}</td>
-<td>${sp.range}</td>
-<td>${sp.duration}</td>
-<td>${sp.level}</td>
-<td><input type="checkbox" ${sp.rp?'checked':''}></td>`;
-tr.querySelector('input').onchange=e=>{
-sp.rp=e.target.checked;save();
-};
+tr.innerHTML=`<td><span class="spell-link">${sp.name}</span></td><td>${sp.cast}</td><td>${sp.range}</td><td>${sp.duration}</td><td>${sp.level}</td><td><input type="checkbox" ${sp.rp?'checked':''}></td>`;
+tr.querySelector('input').onchange=e=>{sp.rp=e.target.checked;save();};
 }
 
 tr.querySelector('.spell-link').onclick=()=>open(sp);
@@ -254,18 +255,12 @@ function open(sp){
 window.currentModalSpell=sp;
 document.getElementById('modalTitle').textContent=sp.name;
 document.getElementById('modalDesc').textContent=sp.desc;
-document.getElementById('modalStats').innerHTML=`
-<div>Cast: ${sp.cast}</div>
-<div>Range: ${sp.range}</div>
-<div>Duration: ${sp.duration}</div>
-<div>Level: ${sp.level}</div>`;
+document.getElementById('modalStats').innerHTML=`<div>Cast: ${sp.cast}</div><div>Range: ${sp.range}</div><div>Duration: ${sp.duration}</div><div>Level: ${sp.level}</div>`;
 document.getElementById('spellModal').classList.add('open');
 }
 
 document.getElementById('spellModal').onclick=e=>{
-if(e.target.id==='spellModal'){
-document.getElementById('spellModal').classList.remove('open');
-}
+if(e.target.id==='spellModal'){document.getElementById('spellModal').classList.remove('open');}
 };
 
 document.getElementById('deleteFromModal').onclick=()=>{
