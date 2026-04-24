@@ -5,40 +5,59 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Gumption Spellbook</title>
 
-<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
 <style>
-:root{--bg:#0f1020;--bg2:#181a2f;--card:#202442;--accent:#7c5cff;--text:#f4f1ff;--muted:#b9b4d9;--danger:#ff5d73;--border:rgba(255,255,255,0.08);}
+:root{--bg:#0f1020;--bg2:#181a2f;--accent:#7c5cff;--text:#f4f1ff;--muted:#b9b4d9;--border:rgba(255,255,255,0.08);}
 *{box-sizing:border-box}
 body{margin:0;font-family:Inter,system-ui;background:radial-gradient(circle at top,#1d1f3f,#070811);color:var(--text)}
 .container{max-width:1200px;margin:auto;padding:24px}
 h1{text-align:center;margin-bottom:20px}
 
 .tabs{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-bottom:20px}
-.tab{padding:10px 16px;border-radius:999px;background:#181a2f;border:1px solid var(--border);cursor:pointer}
+.tab{padding:10px 16px;border-radius:999px;background:#1c1f3a;border:1px solid var(--border);cursor:pointer;color:var(--text)}
+.tab.active{background:linear-gradient(135deg,#7c5cff,#5b7cff);color:white;border:none}
+.tab{padding:10px 16px;border-radius:999px;background:#1c1f3a;border:1px solid var(--border);cursor:pointer}
 .tab.active{background:linear-gradient(135deg,#7c5cff,#5b7cff)}
 
-.tab{padding:10px 16px;border-radius:999px;background:#181a2f;border:1px solid var(--border);cursor:pointer;color:var(--text)}
-.tab.active{background:linear-gradient(135deg,#7c5cff,#5b7cff);color:#fff}
 .panel{background:var(--bg2);padding:20px;border-radius:16px}
+
 .add-row{display:grid;grid-template-columns:1fr auto;gap:10px;margin-bottom:10px}
 
 input{padding:12px;border-radius:10px;border:1px solid var(--border);background:#121427;color:white}
-button{padding:12px;border:none;border-radius:10px;cursor:pointer}
+
+button{padding:10px 14px;border:none;border-radius:10px;cursor:pointer}
+input,select{padding:10px;border-radius:10px;border:1px solid var(--border);background:#121427;color:white}
+
+button{padding:10px;border:none;border-radius:10px;cursor:pointer}
 .primary-btn{background:var(--accent);color:white}
 
 .error-msg{color:#ff9cac;height:20px}
 
-.filter-bar{display:flex;justify-content:space-between;margin-bottom:10px}
-.filter-btn{padding:6px 10px;border-radius:999px;background:#121427;color:var(--muted);border:1px solid var(--border)}
-.filter-btn.active{background:var(--accent);color:white}
+.filter-bar{display:flex;justify-content:space-between;margin-bottom:12px}
+
+.filter-btn{
+padding:6px 10px;
+border-radius:999px;
+background:#121427;
+color:var(--muted);
+border:1px solid var(--border);
+cursor:pointer;
+}
+.filter-btn.active{
+background:var(--accent);
+color:white;
+}
+.filter-btn{padding:6px 10px;border-radius:999px;background:#121427;border:1px solid var(--border)}
+.filter-btn.active{background:var(--accent)}
 
 table{width:100%;border-collapse:collapse}
 th,td{padding:10px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:center}
 th:first-child, td:first-child{text-align:left}
 th:nth-child(2), td:nth-child(2){text-align:left}
+th{cursor:pointer;color:#dcd6ff}
+th,td{padding:10px;border-bottom:1px solid rgba(255,255,255,0.05)}
 th{cursor:pointer}
 
 .spell-link{cursor:pointer;color:#d8ccff}
@@ -46,12 +65,41 @@ th{cursor:pointer}
 .modal{position:fixed;inset:0;background:rgba(0,0,0,0.7);display:none;align-items:center;justify-content:center}
 .modal.open{display:flex}
 .modal-content{background:#202442;padding:20px;border-radius:16px;max-width:700px;width:100%}
+
+/* Footer buttons */
+.panel-footer{
+display:flex;
+justify-content:space-between;
+margin-top:16px;
+gap:10px;
+flex-wrap:wrap;
+}
+.modal-content{background:#202442;padding:20px;border-radius:16px;width:100%;max-width:500px}
+
+/* Mobile */
+@media (max-width:768px){
+.container{padding:16px}
+h1{font-size:20px}
+.tabs{gap:6px}
+.tab{padding:8px 12px;font-size:12px}
+.add-row{grid-template-columns:1fr}
+#addSpellBtn{width:100%}
+.filter-bar{flex-direction:column;gap:10px}
+table{display:block;overflow-x:auto;white-space:nowrap}
+th,td{font-size:12px;padding:8px}
+.modal-content{margin:10px;max-height:90vh;overflow:auto}
+.panel-footer{flex-direction:column}
+.panel-footer button,
+.panel-footer label{width:100%}
+}
+.panel-footer{display:flex;justify-content:space-between;margin-top:16px;gap:10px}
 </style>
 </head>
 
 <body>
 <div class="container">
 <h1>📖 Gumption Spellbook</h1>
+
 <div class="tabs" id="tabs"></div>
 
 <div class="panel">
@@ -69,16 +117,29 @@ th{cursor:pointer}
 </div>
 
 <table>
-<thead><tr></tr></thead>
+<thead><tr id="tableHead"></tr></thead>
 <tbody id="spellTableBody"></tbody>
 </table>
 
+<!-- ✅ FOOTER BUTTONS -->
+<div class="panel-footer">
+<button class="primary-btn" id="customBtn">+ Custom Spell</button>
+
+<label class="primary-btn" for="csvFile" style="text-align:center">
+Import CSV
+</label>
+<label class="primary-btn" for="csvFile">Import CSV</label>
+<input id="csvFile" type="file" accept=".csv" style="display:none">
+</div>
+
 </div>
 </div>
 
+<!-- Modal -->
+<!-- SPELL MODAL -->
 <div class="modal" id="spellModal">
 <div class="modal-content">
-<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+<div style="display:flex;justify-content:space-between;">
 <h2 id="modalTitle"></h2>
 <button id="deleteFromModal">🗑️</button>
 </div>
@@ -87,171 +148,189 @@ th{cursor:pointer}
 </div>
 </div>
 
+<!-- CUSTOM SPELL MODAL -->
+<div class="modal" id="customModal">
+<div class="modal-content">
+<h2>Add Custom Spell</h2>
+
+<input id="cName" placeholder="Name">
+
+<select id="cCast">
+<option>A</option><option>BA</option><option>R</option>
+</select>
+
+<select id="cRange">
+<option>Self</option><option>Touch</option><option>10 feet</option><option>30 feet</option><option>60 feet</option><option>120 feet</option>
+</select>
+
+<select id="cDuration">
+<option>1 round</option><option>1 minute</option><option>10 minutes</option><option>1 hour</option>
+</select>
+
+<select id="cLevel">
+<option>C</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option>
+</select>
+
+<label><input type="checkbox" id="cRP"> RP</label>
+
+<textarea id="cDesc" placeholder="Description" style="margin-top:10px;width:100%;height:80px;"></textarea>
+
+<div style="margin-top:10px;display:flex;gap:10px;">
+<button class="primary-btn" id="saveCustom">Save</button>
+<button id="closeCustom">Cancel</button>
+</div>
+
+</div>
+</div>
+
 <script>
 const firebaseConfig = {
-  apiKey: "AIzaSyD6BdFsQ0x93JuJjCeeaZjB5ASpuTw-ALw",
-  authDomain: "gumption-spellbook.firebaseapp.com",
-  projectId: "gumption-spellbook",
-  storageBucket: "gumption-spellbook.firebasestorage.app",
-  messagingSenderId: "380487584445",
-  appId: "1:380487584445:web:92e4aa63c5ab89c8a705d4"
+const firebaseConfig={
+apiKey:"AIzaSyD6BdFsQ0x93JuJjCeeaZjB5ASpuTw-ALw",
+authDomain:"gumption-spellbook.firebaseapp.com",
+projectId:"gumption-spellbook"
 };
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
+const db=firebase.firestore();
 
 const CHARACTERS=['Candy Calderón','Cooper Howard','Deekin Rush','Kuz Rakata','Percy Fireside'];
 
 let activeCharacter=CHARACTERS[0];
 let showRPView=false;
 let filters={cast:'All',rp:'All RP'};
-let spellbook=initStructure();
+let spellbook={};
 let isLoaded=false;
-let sortState={column:'name',direction:'asc'};
+let csvIndex={};
 
-function initStructure(){
-  const d={};
-  CHARACTERS.forEach(c=>d[c]=[]);
-  return d;
-}
 function initStructure(){const d={};CHARACTERS.forEach(c=>d[c]=[]);return d;}
 
-// ✅ SAFE REALTIME SYNC
-db.collection('spellbook').doc('shared')
-.onSnapshot(doc=>{
-  if(doc.exists){
-    spellbook = doc.data();
-  } else {
-    spellbook = initStructure();
-  }
-  isLoaded = true;
-  render();
 db.collection('spellbook').doc('shared').onSnapshot(doc=>{
-if(doc.exists){spellbook=doc.data();}
-else{spellbook=initStructure();}
+spellbook = doc.exists ? doc.data() : initStructure();
+spellbook=doc.exists?doc.data():initStructure();
 isLoaded=true;
 render();
 });
 
 function save(){
-  if(!isLoaded) return;
-  db.collection('spellbook').doc('shared').set(spellbook, { merge:true });
 if(!isLoaded)return;
 db.collection('spellbook').doc('shared').set(spellbook,{merge:true});
 }
 
+function tabs(){
+const t=document.getElementById('tabs');t.innerHTML='';
+CHARACTERS.forEach(c=>{
+const b=document.createElement('button');
+b.className='tab '+(!showRPView&&c===activeCharacter?'active':'');
+b.textContent=c;
+b.onclick=()=>{activeCharacter=c;showRPView=false;tabs();render()};
+t.appendChild(b);
 function slug(s){return s.trim().toLowerCase().replace(/\s+/g,'-')}
 function cast(c){c=c.toLowerCase();if(c.includes('bonus'))return'BA';if(c.includes('reaction'))return'R';return'A'}
 function lvl(l){return l==0?'C':l}
-function url(n){return`https://www.dndbeyond.com/spells/${slug(n)}`}
 
-function tabs(){
-const t=document.getElementById('tabs');
-t.innerHTML='';
-CHARACTERS.forEach(c=>{
-  const b=document.createElement('button');
-  b.className='tab '+(c===activeCharacter?'active':'');
-  b.textContent=c;
-  b.onclick=()=>{activeCharacter=c;tabs();render()};
-  t.appendChild(b);
+////////////////////////////////
+// CUSTOM SPELL
+////////////////////////////////
+
+customBtn.onclick=()=>customModal.classList.add('open');
+closeCustom.onclick=()=>customModal.classList.remove('open');
+
+saveCustom.onclick=()=>{
+const name=cName.value.trim();
+if(!name)return;
+
+spellbook[activeCharacter].push({
+id:crypto.randomUUID(),
+name,
+cast:cCast.value,
+range:cRange.value,
+duration:cDuration.value,
+level:cLevel.value,
+rp:cRP.checked,
+desc:cDesc.value
 });
+const rp=document.createElement('button');
+rp.className='tab '+(showRPView?'active':'');
+rp.textContent='RP';
+rp.onclick=()=>{showRPView=true;tabs();render()};
+t.appendChild(rp);
 }
-function tabs(){const t=document.getElementById('tabs');t.innerHTML='';
-CHARACTERS.forEach(c=>{const b=document.createElement('button');b.className='tab '+(!showRPView&&c===activeCharacter?'active':'');b.textContent=c;b.onclick=()=>{activeCharacter=c;showRPView=false;tabs();render()};t.appendChild(b)});
-const rp=document.createElement('button');rp.className='tab '+(showRPView?'active':'');rp.textContent='RP';rp.onclick=()=>{showRPView=true;tabs();render()};t.appendChild(rp)}
 
-function filtersUI(){const castOpts=['All','A','BA','R'];const rpOpts=['All RP','RP Only','Hide RP'];
-const c=document.getElementById('castFilters');const r=document.getElementById('rpFilters');c.innerHTML='';r.innerHTML='';
-castOpts.forEach(o=>{const b=document.createElement('button');b.className='filter-btn '+(filters.cast===o?'active':'');b.textContent=o;b.onclick=()=>{filters.cast=o;filtersUI();render()};c.appendChild(b)});
-rpOpts.forEach(o=>{const b=document.createElement('button');b.className='filter-btn '+(filters.rp===o?'active':'');b.textContent=o;b.onclick=()=>{filters.rp=o;filtersUI();render()};r.appendChild(b)})}
+function filtersUI(){
+const castOpts=['All','A','BA','R'];
+const rpOpts=['All RP','RP Only','Hide RP'];
+save();
+customModal.classList.remove('open');
+};
 
-function setSort(col){if(sortState.column===col){sortState.direction=sortState.direction==='asc'?'desc':'asc';}else{sortState.column=col;sortState.direction='asc';}render();}
+const c=document.getElementById('castFilters');
+const r=document.getElementById('rpFilters');
+////////////////////////////////
+// CSV IMPORT
+////////////////////////////////
+
+c.innerHTML='';r.innerHTML='';
+function parseCSV(text){
+const lines=text.split(/\r?\n/);
+const headers=lines[0].split(',');
+
+castOpts.forEach(o=>{
+const b=document.createElement('button');
+b.className='filter-btn '+(filters.cast===o?'active':'');
+b.textContent=o;
+b.onclick=()=>{filters.cast=o;filtersUI();render()};
+c.appendChild(b);
+});
+const index={};
+
+rpOpts.forEach(o=>{
+const b=document.createElement('button');
+b.className='filter-btn '+(filters.rp===o?'active':'');
+b.textContent=o;
+b.onclick=()=>{filters.rp=o;filtersUI();render()};
+r.appendChild(b);
+});
+for(let i=1;i<lines.length;i++){
+const values=lines[i].split(',');
+const row={};
+headers.forEach((h,j)=>row[h.trim()]=values[j]?.trim());
+
+if(row.Name)index[slug(row.Name)]=row;
+}
+return index;
+}
 
 function getSpells(){
-return spellbook[activeCharacter]||[];
-let s;
-if(showRPView){s=[];CHARACTERS.forEach(c=>{spellbook[c].forEach(sp=>{if(sp.rp)s.push({...sp,character:c})})});}
-else{s=[...spellbook[activeCharacter]];if(filters.cast!=='All')s=s.filter(x=>x.cast===filters.cast);if(filters.rp==='RP Only')s=s.filter(x=>x.rp);if(filters.rp==='Hide RP')s=s.filter(x=>!x.rp);}
-s.sort((a,b)=>{let A=a[sortState.column]||'';let B=b[sortState.column]||'';if(A<B)return sortState.direction==='asc'?-1:1;if(A>B)return sortState.direction==='asc'?1:-1;return a.name.localeCompare(b.name);});
-return s;
-}
-
-function render(){
-const b=document.getElementById('spellTableBody');
-const s=getSpells();
-b.innerHTML='';
-getSpells().forEach(sp=>{
-const head=document.querySelector('thead tr');
-
 if(showRPView){
-head.innerHTML=`<th onclick="setSort('character')">Character</th><th onclick="setSort('name')">Name</th><th onclick="setSort('cast')">Cast</th><th onclick="setSort('range')">Range</th><th onclick="setSort('duration')">Duration</th><th onclick="setSort('level')">Lvl</th>`;
-}else{
-head.innerHTML=`<th onclick="setSort('name')">Name</th><th onclick="setSort('cast')">Cast</th><th onclick="setSort('range')">Range</th><th onclick="setSort('duration')">Duration</th><th onclick="setSort('level')">Lvl</th><th onclick="setSort('rp')">RP</th>`;
-}
-
-if(!s.length){b.innerHTML='<tr><td colspan=7>No spells</td></tr>';return;}
-
-s.forEach(sp=>{
-const tr=document.createElement('tr');
-tr.innerHTML=`
-<td><span class="spell-link">${sp.name}</span></td>
-<td>${sp.cast}</td>
-<td>${sp.range}</td>
-<td>${sp.duration}</td>
-<td>${sp.level}</td>
-<td><input type="checkbox" ${sp.rp?'checked':''}></td>
-`;
-if(showRPView){
-tr.innerHTML=`<td>${sp.character}</td><td><span class="spell-link">${sp.name}</span></td><td>${sp.cast}</td><td>${sp.range}</td><td>${sp.duration}</td><td>${sp.level}</td>`;
-tr.querySelector('.spell-link').onclick=()=>open(sp);
-}else{
-tr.innerHTML=`<td><span class="spell-link">${sp.name}</span></td><td>${sp.cast}</td><td>${sp.range}</td><td>${sp.duration}</td><td>${sp.level}</td><td><input type="checkbox" ${sp.rp?'checked':''}></td>`;
-tr.querySelector('.spell-link').onclick=()=>open(sp);
-tr.querySelector('input').onchange=e=>{sp.rp=e.target.checked;save();};
-}
-b.appendChild(tr);
-});
-
-document.querySelector('.add-row').style.display=showRPView?'none':'grid';
-}
-
-function open(sp){
-window.currentModalSpell=sp;
-document.getElementById('modalTitle').textContent=sp.name;
-document.getElementById('modalDesc').textContent=sp.desc;
-document.getElementById('modalStats').innerHTML=`
-<div>Cast: ${sp.cast}</div>
-<div>Range: ${sp.range}</div>
-<div>Duration: ${sp.duration}</div>
-<div>Level: ${sp.level}</div>
-`;
-document.getElementById('modalStats').innerHTML=`<div><b>Cast:</b> ${sp.cast}</div><div><b>Range:</b> ${sp.range}</div><div><b>Duration:</b> ${sp.duration}</div><div><b>Level:</b> ${sp.level}</div>`;
-document.getElementById('spellModal').classList.add('open');
-}
-
-document.getElementById('spellModal').onclick=e=>{
-if(e.target.id==='spellModal'){
-document.getElementById('spellModal').classList.remove('open');
-}
-if(e.target.id==='spellModal'){document.getElementById('spellModal').classList.remove('open');}
+let all=[];
+CHARACTERS.forEach(c=>{
+(spellbook[c]||[]).forEach(s=>{
+if(s.rp)all.push({...s,character:c});
+csvFile.onchange=async e=>{
+const file=e.target.files[0];
+if(!file)return;
+csvIndex=parseCSV(await file.text());
+console.log("CSV Loaded",csvIndex);
 };
 
-document.getElementById('deleteFromModal').onclick=()=>{
-const sp=window.currentModalSpell;
-spellbook[activeCharacter]=spellbook[activeCharacter].filter(x=>x.id!==sp.id);
-save();
-document.getElementById('spellModal').classList.remove('open');
-};
+////////////////////////////////
+// ADD SPELL
+////////////////////////////////
 
 async function add(){
-const input=document.getElementById('spellInput');
-const n=input.value.trim();
-if(!n)return;
-const s=slug(n);
+const name=spellInput.value.trim();
+if(!name)return;
+
+const s=slug(name);
+
 try{
 const r=await fetch(`https://www.dnd5eapi.co/api/spells/${s}`);
-if(!r.ok)throw'';
+if(!r.ok)throw '';
+
 const d=await r.json();
+
 spellbook[activeCharacter].push({
 id:crypto.randomUUID(),
 name:d.name,
@@ -260,23 +339,109 @@ range:d.range,
 duration:d.duration,
 level:lvl(d.level),
 rp:false,
-desc:(d.desc||[]).join('\\n')
+desc:(d.desc||[]).join('\n')
 });
+
 save();
-input.value='';
-spellbook[activeCharacter].push({id:crypto.randomUUID(),name:d.name,url:url(d.name),cast:cast(d.casting_time),range:d.range,duration:d.duration,level:lvl(d.level),rp:false,desc:(d.desc||[]).join('\\n')});
-save();input.value='';
+spellInput.value='';
+return;
+
 }catch{
-document.getElementById('errorMsg').textContent='Spell not found';
-setTimeout(()=>document.getElementById('errorMsg').textContent='',2000);
+const c=csvIndex[s];
+if(c){
+spellbook[activeCharacter].push({
+id:crypto.randomUUID(),
+name:c.Name,
+cast:cast(c['Casting Time']||'1 action'),
+range:c.Range,
+duration:c.Duration,
+level:lvl(c.Level||0),
+rp:false,
+desc:c.Details||''
+});
+return all;
+save();
+spellInput.value='';
+return;
+}
+
+let s=[...(spellbook[activeCharacter]||[])];
+alert("Spell not found");
 }
 }
 
-document.getElementById('addSpellBtn').onclick=add;
-document.getElementById('spellInput').onkeydown=e=>{if(e.key==='Enter')add()};
+if(filters.cast!=='All')s=s.filter(x=>x.cast===filters.cast);
+if(filters.rp==='RP Only')s=s.filter(x=>x.rp);
+if(filters.rp==='Hide RP')s=s.filter(x=>!x.rp);
+addSpellBtn.onclick=add;
+spellInput.onkeydown=e=>{if(e.key==='Enter')add()};
+
+return s;
+}
+////////////////////////////////
+// RENDER
+////////////////////////////////
+
+function render(){
+const b=document.getElementById('spellTableBody');
+const head=document.getElementById('tableHead');
+const b=spellTableBody;
+const head=tableHead;
+
+if(showRPView){
+head.innerHTML='<th>Character</th><th>Name</th><th>Cast</th><th>Range</th><th>Duration</th><th>Lvl</th>';
+}else{
+head.innerHTML='<th>Name</th><th>Cast</th><th>Range</th><th>Duration</th><th>Lvl</th><th>RP</th>';
+}
+
+b.innerHTML='';
+
+getSpells().forEach(sp=>{
+(spellbook[activeCharacter]||[]).forEach(sp=>{
+const tr=document.createElement('tr');
+
+if(showRPView){
+tr.innerHTML=`<td>${sp.character}</td><td><span class="spell-link">${sp.name}</span></td><td>${sp.cast}</td><td>${sp.range}</td><td>${sp.duration}</td><td>${sp.level}</td>`;
+}else{
+tr.innerHTML=`<td><span class="spell-link">${sp.name}</span></td><td>${sp.cast}</td><td>${sp.range}</td><td>${sp.duration}</td><td>${sp.level}</td><td><input type="checkbox" ${sp.rp?'checked':''}></td>`;
+tr.querySelector('input').onchange=e=>{sp.rp=e.target.checked;save();};
+}
+
+tr.querySelector('.spell-link').onclick=()=>open(sp);
+tr.innerHTML=`
+<td><span class="spell-link">${sp.name}</span></td>
+<td>${sp.cast}</td>
+<td>${sp.range}</td>
+<td>${sp.duration}</td>
+<td>${sp.level}</td>
+<td><input type="checkbox" ${sp.rp?'checked':''}></td>
+`;
+
+tr.querySelector('input').onchange=e=>{
+sp.rp=e.target.checked;
+save();
+};
+
+b.appendChild(tr);
+});
+
+document.querySelector('.add-row').style.display=showRPView?'none':'grid';
+filtersUI();
+}
 
 tabs();
-filtersUI();
+
+function tabs(){
+const t=document.getElementById('tabs');
+t.innerHTML='';
+CHARACTERS.forEach(c=>{
+const b=document.createElement('button');
+b.className='tab '+(c===activeCharacter?'active':'');
+b.textContent=c;
+b.onclick=()=>{activeCharacter=c;tabs();render()};
+t.appendChild(b);
+});
+}
 </script>
 </body>
 </html>
