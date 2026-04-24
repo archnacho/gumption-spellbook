@@ -1,30 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gumption Spellbook</title>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+<style>
+:root{--bg:#0f1020;--bg2:#181a2f;--accent:#7c5cff;--text:#f4f1ff;--muted:#b9b4d9;--border:rgba(255,255,255,0.08);}
+*{box-sizing:border-box}
+body{margin:0;font-family:Inter,system-ui;background:radial-gradient(circle at top,#1d1f3f,#070811);color:var(--text)}
+.container{max-width:1200px;margin:auto;padding:24px}
+h1{text-align:center;margin-bottom:20px}
+
+.tabs{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-bottom:20px}
+.tab{padding:10px 16px;border-radius:999px;background:#1c1f3a;border:1px solid var(--border);cursor:pointer}
+.tab.active{background:linear-gradient(135deg,#7c5cff,#5b7cff);color:white;border:none}
+
+.panel{background:var(--bg2);padding:20px;border-radius:16px}
+
+.add-row{display:grid;grid-template-columns:1fr auto;gap:10px;margin-bottom:10px}
+input,select{padding:10px;border-radius:10px;border:1px solid var(--border);background:#121427;color:white;width:100%}
+
+button{padding:10px;border:none;border-radius:10px;cursor:pointer}
+.primary-btn{background:var(--accent);color:white}
+
+.filter-bar{display:flex;justify-content:space-between;margin-bottom:12px}
+.filter-btn{padding:6px 10px;border-radius:999px;background:#121427;border:1px solid var(--border);cursor:pointer}
+.filter-btn.active{background:var(--accent)}
+
+table{width:100%;border-collapse:collapse}
+th,td{padding:10px;border-bottom:1px solid rgba(255,255,255,0.05)}
+th{cursor:pointer}
+
+.modal{position:fixed;inset:0;background:rgba(0,0,0,0.7);display:none;align-items:center;justify-content:center}
+.modal.open{display:flex}
+.modal-content{background:#202442;padding:20px;border-radius:16px;width:100%;max-width:500px}
+
+.panel-footer{display:flex;justify-content:space-between;margin-top:16px;gap:10px}
+</style>
+</head>
+
+<body>
+<div class="container">
+<h1>📖 Gumption Spellbook</h1>
+
+<div class="tabs" id="tabs"></div>
+
+<div class="panel">
+
+<div class="add-row">
+<input id="spellInput" placeholder="Enter spell">
+<button id="addSpellBtn" class="primary-btn">Add</button>
+</div>
+
+<div class="filter-bar">
+<div id="castFilters"></div>
+<div id="rpFilters"></div>
+</div>
+
+<table>
+<thead><tr id="tableHead"></tr></thead>
+<tbody id="spellTableBody"></tbody>
+</table>
+
+<div class="panel-footer">
+<button class="primary-btn" id="customBtn">+ Custom Spell</button>
+<label class="primary-btn" for="csvFile">Import CSV</label>
+<input id="csvFile" type="file" style="display:none">
+</div>
+
+</div>
+</div>
+
+<!-- CUSTOM SPELL MODAL -->
+<div class="modal" id="customModal">
+<div class="modal-content">
+<h2>Add Custom Spell</h2>
+
+<input id="cName" placeholder="Name">
+
+<select id="cCast">
+<option>A</option>
+<option>BA</option>
+<option>R</option>
+</select>
+
+<select id="cRange">
+<option>Self</option><option>Touch</option><option>30 feet</option><option>60 feet</option><option>120 feet</option>
+</select>
+
+<select id="cDuration">
+<option>1 round</option><option>1 minute</option><option>10 minutes</option><option>1 hour</option>
+</select>
+
+<select id="cLevel">
+<option>C</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option>
+</select>
+
+<label><input type="checkbox" id="cRP"> RP</label>
+
+<div style="margin-top:10px;display:flex;gap:10px;">
+<button class="primary-btn" id="saveCustom">Save</button>
+<button id="closeCustom">Cancel</button>
+</div>
+
+</div>
+</div>
+
 <script>
-const firebaseConfig = {
-apiKey:"AIzaSyD6BdFsQ0x93JuJjCeeaZjB5ASpuTw-ALw",
+const firebaseConfig={
+apiKey:"AIzaSy...",
 authDomain:"gumption-spellbook.firebaseapp.com",
 projectId:"gumption-spellbook"
 };
-
 firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
+const db=firebase.firestore();
 
 const CHARACTERS=['Candy Calderón','Cooper Howard','Deekin Rush','Kuz Rakata','Percy Fireside'];
-
 let activeCharacter=CHARACTERS[0];
-let showRPView=false;
-let filters={cast:'All',rp:'All RP'};
 let spellbook={};
 let isLoaded=false;
-let csvIndex={}; // 🔥 IMPORTANT
 
-function initStructure(){
-const d={};
-CHARACTERS.forEach(c=>d[c]=[]);
-return d;
-}
+function initStructure(){const d={};CHARACTERS.forEach(c=>d[c]=[]);return d;}
 
 db.collection('spellbook').doc('shared').onSnapshot(doc=>{
-spellbook = doc.exists ? doc.data() : initStructure();
+spellbook=doc.exists?doc.data():initStructure();
 isLoaded=true;
 render();
 });
@@ -33,20 +136,6 @@ function save(){
 if(!isLoaded)return;
 db.collection('spellbook').doc('shared').set(spellbook,{merge:true});
 }
-
-function slug(s){return s.trim().toLowerCase().replace(/\s+/g,'-')}
-function cast(c){
-c=c.toLowerCase();
-if(c.includes('bonus'))return'BA';
-if(c.includes('reaction'))return'R';
-return'A';
-}
-function lvl(l){return l==0?'C':l}
-function url(n){return`https://www.dndbeyond.com/spells/${slug(n)}`}
-
-/////////////////////////////////////
-// ✅ CUSTOM SPELL BUTTON FIX
-/////////////////////////////////////
 
 document.getElementById('customBtn').onclick=()=>{
 document.getElementById('customModal').classList.add('open');
@@ -65,10 +154,8 @@ range:document.getElementById('cRange').value,
 duration:document.getElementById('cDuration').value,
 level:document.getElementById('cLevel').value,
 rp:document.getElementById('cRP').checked,
-desc:document.getElementById('cDesc')?.value || "Custom spell"
+desc:"Custom spell"
 };
-
-if(!spell.name)return;
 
 spellbook[activeCharacter].push(spell);
 save();
@@ -76,108 +163,4 @@ save();
 document.getElementById('customModal').classList.remove('open');
 };
 
-/////////////////////////////////////
-// ✅ CSV IMPORT FIX
-/////////////////////////////////////
-
-function parseCSV(text){
-const lines=text.split(/\r?\n/);
-const headers=lines[0].split(',');
-
-const index={};
-
-for(let i=1;i<lines.length;i++){
-const values=lines[i].split(',');
-if(!values.length)continue;
-
-const row={};
-headers.forEach((h,j)=>row[h.trim()]=values[j]?.trim());
-
-if(row.Name){
-index[slug(row.Name)]=row;
-}
-}
-return index;
-}
-
-document.getElementById('csvFile').onchange=async (e)=>{
-const file=e.target.files[0];
-if(!file)return;
-
-const text=await file.text();
-csvIndex=parseCSV(text);
-
-console.log("CSV Loaded:", csvIndex); // debug
-};
-
-/////////////////////////////////////
-// ✅ ADD SPELL (API + CSV fallback)
-/////////////////////////////////////
-
-async function add(){
-const input=document.getElementById('spellInput');
-const name=input.value.trim();
-if(!name)return;
-
-const s=slug(name);
-
-try{
-const r=await fetch(`https://www.dnd5eapi.co/api/spells/${s}`);
-if(!r.ok)throw 'api fail';
-
-const d=await r.json();
-
-spellbook[activeCharacter].push({
-id:crypto.randomUUID(),
-name:d.name,
-url:url(d.name),
-cast:cast(d.casting_time),
-range:d.range,
-duration:d.duration,
-level:lvl(d.level),
-rp:false,
-desc:(d.desc||[]).join('\\n')
-});
-
-save();
-input.value='';
-return;
-
-}catch(e){
-
-// 🔥 CSV FALLBACK
-const c=csvIndex[s];
-
-if(c){
-spellbook[activeCharacter].push({
-id:crypto.randomUUID(),
-name:c.Name,
-url:url(c.Name),
-cast:cast(c['Casting Time']||'1 action'),
-range:c.Range||'',
-duration:c.Duration||'',
-level:lvl(c.Level||0),
-rp:false,
-desc:c.Details||''
-});
-
-save();
-input.value='';
-return;
-}
-
-// ❌ STILL NOT FOUND
-document.getElementById('errorMsg').textContent='Spell not found';
-setTimeout(()=>document.getElementById('errorMsg').textContent='',2000);
-
-}
-}
-
-document.getElementById('addSpellBtn').onclick=add;
-document.getElementById('spellInput').onkeydown=e=>{if(e.key==='Enter')add()};
-
-/////////////////////////////////////
-// (rest of your render + tabs stays SAME)
-/////////////////////////////////////
-
-</script>
+function
