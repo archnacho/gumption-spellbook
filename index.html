@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Gumption Spellbook</title>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
 <style>
 :root{--bg:#0f1020;--bg2:#181a2f;--card:#202442;--accent:#7c5cff;--text:#f4f1ff;--muted:#b9b4d9;--danger:#ff5d73;--border:rgba(255,255,255,0.08);}*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui;background:radial-gradient(circle at top,#1d1f3f,#070811);color:var(--text)}.container{max-width:1200px;margin:auto;padding:24px}h1{text-align:center;margin-bottom:20px}.tabs{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-bottom:20px}.tab{padding:10px 16px;border-radius:999px;background:#181a2f;border:1px solid var(--border);cursor:pointer;color:var(--text)}.tab.active{background:linear-gradient(135deg,#7c5cff,#5b7cff);color:#fff;border-color:transparent}.panel{background:var(--bg2);padding:20px;border-radius:16px}
 .add-row{display:grid;grid-template-columns:1fr auto;gap:10px;margin-bottom:10px}
@@ -24,6 +29,7 @@ th:nth-child(2), td:nth-child(2){text-align:left}
 th{cursor:pointer}
 </style>
 </head>
+
 <body>
 <div class="container">
 <h1>📖 Gumption Spellbook</h1>
@@ -36,10 +42,12 @@ th{cursor:pointer}
 <button id="addSpellBtn" class="primary-btn">Add</button>
 </div>
 <div id="errorMsg" class="error-msg"></div>
+
 <div class="filter-bar">
 <div id="castFilters"></div>
 <div id="rpFilters"></div>
 </div>
+
 <table>
 <thead><tr></tr></thead>
 <tbody id="spellTableBody"></tbody>
@@ -58,55 +66,62 @@ th{cursor:pointer}
 </div>
 </div>
 
-<div class="modal" id="customModal">
-<div class="modal-content">
-<h2>Add Custom Spell</h2>
-<input id="customName" placeholder="Name" style="width:100%;margin-bottom:10px">
-<select id="customCast"><option>A</option><option>BA</option><option>R</option></select>
-<select id="customRange">
-<option>Self</option><option>Touch</option><option>10 feet</option><option>20 feet</option><option>30 feet</option><option>40 feet</option><option>50 feet</option><option>60 feet</option><option>90 feet</option><option>120 feet</option><option>Over 120</option>
-</select>
-<select id="customDuration">
-<option>1 round</option><option>1 minute</option><option>10 minutes</option><option>1 hour</option>
-</select>
-<select id="customLevel">
-<option>C</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option>
-</select>
-<label><input type="checkbox" id="customRP"> RP</label>
-<div style="margin-top:10px">
-<button id="saveCustom" class="primary-btn">Save</button>
-<button id="closeCustom">Cancel</button>
-</div>
-</div>
-</div>
-
 <div class="modal" id="spellModal">
 <div class="modal-content">
-
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
 <h2 id="modalTitle" style="margin:0;"></h2>
 <button id="deleteFromModal" style="background:transparent;border:none;color:#ff9cac;font-size:18px;cursor:pointer">🗑️</button>
 </div>
-
 <div id="modalStats" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px"></div>
 <div id="modalDesc"></div>
-
 </div>
 </div>
 
 <script>
+const firebaseConfig = {
+  apiKey: "AIzaSyD6BdFsQ0x93JuJjCeeaZjB5ASpuTw-ALw",
+  authDomain: "gumption-spellbook.firebaseapp.com",
+  projectId: "gumption-spellbook",
+  storageBucket: "gumption-spellbook.firebasestorage.app",
+  messagingSenderId: "380487584445",
+  appId: "1:380487584445:web:92e4aa63c5ab89c8a705d4"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
 const CHARACTERS=['Candy Calderón','Cooper Howard','Deekin Rush','Kuz Rakata','Percy Fireside'];
-const STORAGE_KEY='gumptionSpellbook';
+
 let activeCharacter=CHARACTERS[0];
 let showRPView=false;
 let filters={cast:'All',rp:'All RP'};
-let spellbook=load();
+let spellbook=initStructure();
 let csvIndex={};
 
 let sortState={column:'name',direction:'asc'};
 
-function load(){const s=JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}');const d={};CHARACTERS.forEach(c=>d[c]=s[c]||[]);return d}
-function save(){localStorage.setItem(STORAGE_KEY,JSON.stringify(spellbook))}
+function initStructure(){
+  const d={};
+  CHARACTERS.forEach(c=>d[c]=[]);
+  return d;
+}
+
+// 🔥 REALTIME SYNC
+db.collection('spellbook').doc('shared')
+.onSnapshot(doc=>{
+  if(doc.exists){
+    spellbook = doc.data();
+  } else {
+    spellbook = initStructure();
+    save();
+  }
+  render();
+});
+
+function save(){
+  db.collection('spellbook').doc('shared').set(spellbook);
+}
+
 function slug(s){return s.trim().toLowerCase().replace(/\s+/g,'-')}
 function cast(c){c=c.toLowerCase();if(c.includes('bonus'))return'BA';if(c.includes('reaction'))return'R';return'A'}
 function lvl(l){return l==0?'C':l}
@@ -171,21 +186,9 @@ b.innerHTML='';
 const head=document.querySelector('thead tr');
 
 if(showRPView){
-head.innerHTML=`
-<th onclick="setSort('character')">Character</th>
-<th onclick="setSort('name')">Name</th>
-<th onclick="setSort('cast')">Cast</th>
-<th onclick="setSort('range')">Range</th>
-<th onclick="setSort('duration')">Duration</th>
-<th onclick="setSort('level')">Lvl</th>`;
+head.innerHTML=`<th onclick="setSort('character')">Character</th><th onclick="setSort('name')">Name</th><th onclick="setSort('cast')">Cast</th><th onclick="setSort('range')">Range</th><th onclick="setSort('duration')">Duration</th><th onclick="setSort('level')">Lvl</th>`;
 }else{
-head.innerHTML=`
-<th onclick="setSort('name')">Name</th>
-<th onclick="setSort('cast')">Cast</th>
-<th onclick="setSort('range')">Range</th>
-<th onclick="setSort('duration')">Duration</th>
-<th onclick="setSort('level')">Lvl</th>
-<th onclick="setSort('rp')">RP</th>`;
+head.innerHTML=`<th onclick="setSort('name')">Name</th><th onclick="setSort('cast')">Cast</th><th onclick="setSort('range')">Range</th><th onclick="setSort('duration')">Duration</th><th onclick="setSort('level')">Lvl</th><th onclick="setSort('rp')">RP</th>`;
 }
 
 if(!s.length){b.innerHTML='<tr><td colspan=7>No spells</td></tr>';return;}
@@ -198,7 +201,7 @@ tr.querySelector('.spell-link').onclick=()=>open(sp);
 }else{
 tr.innerHTML=`<td><span class="spell-link">${sp.name}</span></td><td>${sp.cast}</td><td>${sp.range}</td><td>${sp.duration}</td><td>${sp.level}</td><td><input type="checkbox" ${sp.rp?'checked':''}></td>`;
 tr.querySelector('.spell-link').onclick=()=>open(sp);
-tr.querySelector('input').onchange=e=>{sp.rp=e.target.checked;save();render()};
+tr.querySelector('input').onchange=e=>{sp.rp=e.target.checked;save();};
 }
 b.appendChild(tr);
 });
@@ -210,29 +213,20 @@ function open(sp){
 window.currentModalSpell=sp;
 document.getElementById('modalTitle').textContent=sp.name;
 document.getElementById('modalDesc').textContent=sp.desc;
-document.getElementById('modalStats').innerHTML=`
-<div><b>Cast:</b> ${sp.cast}</div>
-<div><b>Range:</b> ${sp.range}</div>
-<div><b>Duration:</b> ${sp.duration}</div>
-<div><b>Level:</b> ${sp.level}</div>`;
+document.getElementById('modalStats').innerHTML=`<div><b>Cast:</b> ${sp.cast}</div><div><b>Range:</b> ${sp.range}</div><div><b>Duration:</b> ${sp.duration}</div><div><b>Level:</b> ${sp.level}</div>`;
 document.getElementById('spellModal').classList.add('open');
 }
 
 document.getElementById('spellModal').addEventListener('click',e=>{
-if(e.target.id==='spellModal'){
-document.getElementById('spellModal').classList.remove('open');
-}
+if(e.target.id==='spellModal'){document.getElementById('spellModal').classList.remove('open');}
 });
 
 document.getElementById('deleteFromModal').onclick=()=>{
 const sp=window.currentModalSpell;
 spellbook[activeCharacter]=spellbook[activeCharacter].filter(x=>x.id!==sp.id);
-save();render();
+save();
 document.getElementById('spellModal').classList.remove('open');
 };
-
-function parseCSV(t){const l=t.split(/\n/);const h=l[0].split(',');const idx={};for(let i=1;i<l.length;i++){const v=l[i].split(',');const row={};h.forEach((k,j)=>row[k]=v[j]);if(row.Name)idx[slug(row.Name)]=row}return idx}
-document.getElementById('csvFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;csvIndex=parseCSV(await f.text())};
 
 async function add(){
 const input=document.getElementById('spellInput');
@@ -244,16 +238,10 @@ const r=await fetch(`https://www.dnd5eapi.co/api/spells/${s}`);
 if(!r.ok)throw'';
 const d=await r.json();
 spellbook[activeCharacter].push({id:crypto.randomUUID(),name:d.name,url:url(d.name),cast:cast(d.casting_time),range:d.range,duration:d.duration,level:lvl(d.level),rp:false,desc:(d.desc||[]).join('\n')});
-save();input.value='';render();
+save();input.value='';
 }catch{
-const c=csvIndex[s];
-if(c){
-spellbook[activeCharacter].push({id:crypto.randomUUID(),name:c.Name,url:url(c.Name),cast:cast(c['Casting Time']||'1 action'),range:c.Range,duration:c.Duration,level:lvl(c.Level||0),rp:false,desc:c.Details||''});
-save();input.value='';render();
-}else{
 document.getElementById('errorMsg').textContent='Spell not found';
 setTimeout(()=>document.getElementById('errorMsg').textContent='',2000);
-}
 }
 }
 
@@ -262,7 +250,6 @@ document.getElementById('spellInput').onkeydown=e=>{if(e.key==='Enter')add()};
 
 tabs();
 filtersUI();
-render();
 </script>
 </body>
 </html>
