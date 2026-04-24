@@ -29,9 +29,14 @@ button{padding:10px;border:none;border-radius:10px;cursor:pointer}
 .primary-btn{background:var(--accent);color:white}
 
 .filter-bar{display:flex;justify-content:space-between;margin-bottom:12px}
+.filter-btn{padding:6px 10px;border-radius:999px;background:#121427;border:1px solid var(--border)}
+.filter-btn.active{background:var(--accent)}
 
 table{width:100%;border-collapse:collapse}
 th,td{padding:10px;border-bottom:1px solid rgba(255,255,255,0.05)}
+th{cursor:pointer}
+
+.spell-link{cursor:pointer;color:#d8ccff}
 
 .modal{position:fixed;inset:0;background:rgba(0,0,0,0.7);display:none;align-items:center;justify-content:center}
 .modal.open{display:flex}
@@ -70,6 +75,18 @@ th,td{padding:10px;border-bottom:1px solid rgba(255,255,255,0.05)}
 <input id="csvFile" type="file" accept=".csv" style="display:none">
 </div>
 
+</div>
+</div>
+
+<!-- SPELL MODAL -->
+<div class="modal" id="spellModal">
+<div class="modal-content">
+<div style="display:flex;justify-content:space-between;">
+<h2 id="modalTitle"></h2>
+<button id="deleteFromModal">🗑️</button>
+</div>
+<div id="modalStats"></div>
+<div id="modalDesc"></div>
 </div>
 </div>
 
@@ -120,20 +137,13 @@ const db=firebase.firestore();
 const CHARACTERS=['Candy Calderón','Cooper Howard','Deekin Rush','Kuz Rakata','Percy Fireside'];
 
 let activeCharacter=CHARACTERS[0];
+let showRPView=false;
+let filters={cast:'All',rp:'All RP'};
 let spellbook={};
 let isLoaded=false;
 let csvIndex={};
 
-const slug = s => s.trim().toLowerCase().replace(/\s+/g,'-');
-const cast = c => c.toLowerCase().includes('bonus') ? 'BA' :
-                   c.toLowerCase().includes('reaction') ? 'R' : 'A';
-const lvl = l => l==0 ? 'C' : l;
-
-function initStructure(){
-const d={};
-CHARACTERS.forEach(c=>d[c]=[]);
-return d;
-}
+function initStructure(){const d={};CHARACTERS.forEach(c=>d[c]=[]);return d;}
 
 db.collection('spellbook').doc('shared').onSnapshot(doc=>{
 spellbook=doc.exists?doc.data():initStructure();
@@ -146,62 +156,69 @@ if(!isLoaded)return;
 db.collection('spellbook').doc('shared').set(spellbook,{merge:true});
 }
 
-//////////////////////////////// CUSTOM SPELL
+function slug(s){return s.trim().toLowerCase().replace(/\s+/g,'-')}
+function cast(c){c=c.toLowerCase();if(c.includes('bonus'))return'BA';if(c.includes('reaction'))return'R';return'A'}
+function lvl(l){return l==0?'C':l}
 
-document.getElementById('customBtn').onclick=()=>document.getElementById('customModal').classList.add('open');
-document.getElementById('closeCustom').onclick=()=>document.getElementById('customModal').classList.remove('open');
+////////////////////////////////
+// CUSTOM SPELL
+////////////////////////////////
 
-document.getElementById('saveCustom').onclick=()=>{
-const name=document.getElementById('cName').value.trim();
+customBtn.onclick=()=>customModal.classList.add('open');
+closeCustom.onclick=()=>customModal.classList.remove('open');
+
+saveCustom.onclick=()=>{
+const name=cName.value.trim();
 if(!name)return;
 
 spellbook[activeCharacter].push({
 id:crypto.randomUUID(),
 name,
-cast:document.getElementById('cCast').value,
-range:document.getElementById('cRange').value,
-duration:document.getElementById('cDuration').value,
-level:document.getElementById('cLevel').value,
-rp:document.getElementById('cRP').checked,
-desc:document.getElementById('cDesc').value
+cast:cCast.value,
+range:cRange.value,
+duration:cDuration.value,
+level:cLevel.value,
+rp:cRP.checked,
+desc:cDesc.value
 });
 
 save();
-document.getElementById('customModal').classList.remove('open');
+customModal.classList.remove('open');
 };
 
-//////////////////////////////// CSV
+////////////////////////////////
+// CSV IMPORT
+////////////////////////////////
 
 function parseCSV(text){
 const lines=text.split(/\r?\n/);
 const headers=lines[0].split(',');
+
 const index={};
 
 for(let i=1;i<lines.length;i++){
-if(!lines[i].trim()) continue;
-
 const values=lines[i].split(',');
 const row={};
 headers.forEach((h,j)=>row[h.trim()]=values[j]?.trim());
 
-if(row.Name){
-index[slug(row.Name)] = row;
-}
+if(row.Name)index[slug(row.Name)]=row;
 }
 return index;
 }
 
-document.getElementById('csvFile').onchange=async e=>{
+csvFile.onchange=async e=>{
 const file=e.target.files[0];
 if(!file)return;
 csvIndex=parseCSV(await file.text());
+console.log("CSV Loaded",csvIndex);
 };
 
-//////////////////////////////// ADD SPELL
+////////////////////////////////
+// ADD SPELL
+////////////////////////////////
 
 async function add(){
-const input=document.getElementById('spellInput');
-const name=input.value.trim();
+const name=spellInput.value.trim();
 if(!name)return;
 
 const s=slug(name);
@@ -224,25 +241,24 @@ desc:(d.desc||[]).join('\n')
 });
 
 save();
-input.value='';
+spellInput.value='';
 return;
 
 }catch{
 const c=csvIndex[s];
-
 if(c){
 spellbook[activeCharacter].push({
 id:crypto.randomUUID(),
-name:c.Name || name,
+name:c.Name,
 cast:cast(c['Casting Time']||'1 action'),
-range:c.Range || '',
-duration:c.Duration || '',
+range:c.Range,
+duration:c.Duration,
 level:lvl(c.Level||0),
 rp:false,
-desc:c.Details || ''
+desc:c.Details||''
 });
 save();
-input.value='';
+spellInput.value='';
 return;
 }
 
@@ -250,23 +266,25 @@ alert("Spell not found");
 }
 }
 
-document.getElementById('addSpellBtn').onclick=add;
-document.getElementById('spellInput').onkeydown=e=>{if(e.key==='Enter')add()};
+addSpellBtn.onclick=add;
+spellInput.onkeydown=e=>{if(e.key==='Enter')add()};
 
-//////////////////////////////// RENDER
+////////////////////////////////
+// RENDER
+////////////////////////////////
 
 function render(){
-const head=document.getElementById('tableHead');
-const body=document.getElementById('spellTableBody');
+const b=spellTableBody;
+const head=tableHead;
 
 head.innerHTML='<th>Name</th><th>Cast</th><th>Range</th><th>Duration</th><th>Lvl</th><th>RP</th>';
-body.innerHTML='';
+
+b.innerHTML='';
 
 (spellbook[activeCharacter]||[]).forEach(sp=>{
 const tr=document.createElement('tr');
-
 tr.innerHTML=`
-<td>${sp.name}</td>
+<td><span class="spell-link">${sp.name}</span></td>
 <td>${sp.cast}</td>
 <td>${sp.range}</td>
 <td>${sp.duration}</td>
@@ -279,9 +297,11 @@ sp.rp=e.target.checked;
 save();
 };
 
-body.appendChild(tr);
+b.appendChild(tr);
 });
 }
+
+tabs();
 
 function tabs(){
 const t=document.getElementById('tabs');
@@ -294,8 +314,6 @@ b.onclick=()=>{activeCharacter=c;tabs();render()};
 t.appendChild(b);
 });
 }
-
-tabs();
 </script>
 </body>
 </html>
